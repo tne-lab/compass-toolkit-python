@@ -78,6 +78,7 @@ def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, X
     elif DISTR[1] == 1:
         return np.array([]),Yb
 """
+Example Input - 
 Param = {'nd': 1,
          'nIb': 1,
          'xM': np.array([[1, 0], [0, 1]]),
