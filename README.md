@@ -13,3 +13,4 @@ compass_sampling.py
 
 # Optimization Algorithms 
 
+Includes details for the algorithm used for optimization application 
