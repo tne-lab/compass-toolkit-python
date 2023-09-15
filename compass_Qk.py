@@ -11,6 +11,12 @@ Following modifications done:
 6. assigned correct initial values
 7. renamed the variables
 8. Changed the comment from single to double quotes
+
+15th Sep 2023
+Following modifications were made to
+1. Removed the loops which were replaced by np.where
+2. Optimized the code for speed.
+3. Added variables separately
 """
 import numpy as np
 
@@ -21,26 +27,17 @@ def compass_Qk(tIn=None, tParam=None):
     tParam.nx = number of hidden state
     tParam.dLinkMap, the link function between X and continuous variable
     """
-    q_matrix = []
-    for k in range(0, len(tIn)):
-        temp = np.ones((tParam['nd'], len(tParam['xM'])))
-        for i in range(0, tParam['nd']):
-            for j in range(0, len(tParam['xM'])):
-                if tParam['dLinkMap'][i, j]:
-                    temp[i, j] = tIn[k, tParam['dLinkMap'][i, j]]
-        q_matrix.append(temp)
-
-    p_matrix = np.zeros((tParam['nd'], tParam['nIb']))
-    for i in range(0, tParam['nd']):
-        for j in range(0, tParam['nIb']):
-            if tParam['dConstantUpdate'][i, j] == 1:
-                p_matrix[i, j] = 1
+    dLinkMap = tParam['dLinkMap']
+    dConstantUpdate = tParam['dConstantUpdate']
+    q_matrix = [np.where(dLinkMap, tIn[k, dLinkMap], 1.0) for k in range(len(tIn))]
+    p_matrix = np.where(dConstantUpdate, 1.0, 0.0)
     return q_matrix, p_matrix
 
-"""
+
+'''
 Param = {'nd': 3, 'nIb': 3, 'xM': np.array([1, 6, 8]), 'dLinkMap': np.array([[0, 1, 0], [1, 1, 0], [1, 1, 1]]),
          'dConstantUpdate': np.array([[0, 1, 0], [1, 1, 0], [1, 1, 1]])}
 [P, Q] = compass_Qk(tIn=np.array([[10253, 65, 3, 9, 67, 98], [1234, 5, 3, 9, 67, 98]]), tParam=Param)
 print(P)
 print(Q)
-"""
+'''
