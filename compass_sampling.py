@@ -25,7 +25,7 @@ from scipy.stats import gamma
 
 
 # DISTR,Cut_Time,Uk,In,Ib,Param,XPos0,SPos0
-def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, XPos0=None, SPos0=None):
+def compass_sampling(DISTR=None, Cut_Time=None, tIn=None, tParam=None, Ib=None, XPos0=None, SPos0=None):
     """
     %% Input Argument
     % DISTR, a vecotr of two variables. The [1 0] means there is only normal
@@ -48,7 +48,8 @@ def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, X
     % YP reaction time
     % YB binary decision
     """
-    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of Input
+    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of
+    # Input
     Yn = []
     Yb = []
     if DISTR[0] >= 1:
@@ -108,7 +109,7 @@ def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, X
     SPre = Ak @ SPos0 @ Ak.T + Wk
 
     """Data observation: Normal"""
-    if DISTR[0] == 1: # main observation is Normal
+    if DISTR[0] == 1:  # main observation is Normal
         #  Filtering
         CTk = (Ck * MCk[0]) @ xM
         DTk = Dk
@@ -128,9 +129,9 @@ def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, X
         # YP, Sk
         EYn = np.exp(CTk @ XPre + DTk @ tIn.T)
         # Generate a sample - we assume it is scalar
-        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 @ EYn @ EYn) @ np.linalg.inv(Vk)), 0.01)
+        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 * EYn * EYn) * 1/Vk), 0.01)
         ys = ys - S
-        Pa = gamma.pdf(ys, a=EYn @ Vk, scale= np.linalg.inv(Vk))
+        Pa = gamma.pdf(ys, a=EYn @ Vk, scale=np.linalg.inv(Vk))
         CPa = np.cumsum(Pa)
         CPa = CPa / np.sum(CPa)
         Yn = S + ys[np.argmin(np.abs(np.random.rand(1) - CPa))]
@@ -146,11 +147,12 @@ def compass_sampling(DISTR=None,Cut_Time=None, tIn=None, tParam=None, Ib=None, X
             Yb = 1
     # return variables
     if DISTR[0] == 2 and DISTR[1] == 1:
-        return Yb,Yn
+        return Yb, Yn
     elif DISTR[0] == 2:
-        return Yn,np.array([])
+        return Yn, np.array([])
     elif DISTR[1] == 1:
-        return np.array([]),Yb
+        return np.array([]), Yb
+
 
 Param = {'nd': 1,
          'nIb': 1,
@@ -169,12 +171,13 @@ Param = {'nd': 1,
          'cConstantUpdate': np.array([[0, 3, 1]]),
          'Vk': 4.951167805469680,
          'S': 0.10,
-         'Ek': np.array([[1,1]]),
-         'Fk': np.array([[0,0,0]])
+         'Ek': np.array([[1, 1]]),
+         'Fk': np.array([[0, 0, 0]])
          }
 DISTR = [1, 1]
 
-print(compass_sampling(DISTR=[2, 0], tIn=np.array([[1, 0, 1]]), Ib=np.array([[1,0,1]]), tParam=Param,
-                 XPos0=np.array([[-4.76676019471412], [0]]), SPos0=np.array([[0.120655723947377, -0.00399920004000000],
-                                                                             [-0.00399920004000000,
-                                                                              0.0706739399093090]]), Cut_Time=1))
+print(compass_sampling(DISTR=[2, 0], tIn=np.array([[1, 0, 1]]), Ib=np.array([[1, 0, 1]]), tParam=Param,
+                       XPos0=np.array([[-4.76676019471412], [0]]),
+                       SPos0=np.array([[0.120655723947377, -0.00399920004000000],
+                                       [-0.00399920004000000,
+                                        0.0706739399093090]]), Cut_Time=1))
