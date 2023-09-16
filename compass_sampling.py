@@ -1,7 +1,5 @@
 """
-Translation of MATLAB code 'compass_Tk.m' to python
-Same as Qk functionally, can therefore be merged together, however for time being
-we keep it combined to avoid any confusion
+Translation of MATLAB code 'compass_sampling.m' to python
 2nd Dec 2022 Translated, Tested & Modified by Sumedh Nagrale
 Following modifications done:
 1. Removed breaks
@@ -13,7 +11,7 @@ Following modifications done:
 7. renamed the variables
 8. Changed the comment from single to double quotes
 
-15th Sep 2023
+16th Sep 2023
 Following modifications were made to
 1. Removing bugs
 """
