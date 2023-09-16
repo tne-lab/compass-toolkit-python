@@ -12,6 +12,8 @@ compass_sampling.py
 
 compass_post_sampling.py
 
+compass_deviance.py
+
 compass_em.py
 
 
