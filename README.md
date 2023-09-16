@@ -10,7 +10,10 @@ compass_Tk.py
 
 compass_sampling.py
 
+compass_post_sampling.py
+
 compass_em.py
+
 
 # Optimization Algorithms 
 
