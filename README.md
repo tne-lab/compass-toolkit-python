@@ -19,7 +19,9 @@ compass_create_state_space.py
 compass_set_learning_param.py
 
 compass_em.py
+
 subfunctions-> bernoulli_param.py
+
 subfunctions-> gamma_param_full.py
 
 # Optimization Algorithms 
