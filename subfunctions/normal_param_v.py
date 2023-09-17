@@ -8,29 +8,25 @@ import numpy as np
 from scipy.stats import norm
 
 
-#  Normal parameters - C,D and Sv
-def NormalParamCDV(p, ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
+# Normal parameters - C,D
+def NormalParamV(p, Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
     # replace params
+    ck = Ck
+    dk = Dk
     sv = p[0]
-    ck[c_fill_ind] = p[1:0 + len(c_fill_ind)]
-    dk[d_fill_ind] = p[1 + len(c_fill_ind):]
-
     # function value
     f = 0
-
     # now, calculate a part
     val_ind = np.where(obs_valid)[0]
     for l in range(len(val_ind)):
         # valid indexes
         z = val_ind[l]
-
         # param on time
-        ctk = ck * MCk[z] @ xM
+        ctk = (ck * MCk[z]) @ xM
         dtk = dk
-
+        
         dy = Yn[z] - ctk @ XSmt[z] - dtk @ In[z].T
         sy = ctk @ SSmt[z] @ ctk.T
-
         if obs_valid[z] == 1:
             f += 0.5 * np.log(sv) + (dy ** 2 + sy) / (2 * sv)
 
@@ -43,5 +39,4 @@ def NormalParamCDV(p, ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XS
             g1 = norm.pdf(h0, loc=0, scale=1) / g0
             gt = (1 / np.sqrt(sv)) * h0 * g1 - g1 ** 2
             f -= np.log(g0) - 0.5 * sy * gt
-
     return f
