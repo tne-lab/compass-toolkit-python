@@ -18,6 +18,8 @@ compass_em.py
 
 compass_create_state_space.py
 
+compass_set_learning_param.py
+
 # Optimization Algorithms 
 
 Includes details for the algorithm used for optimization application 
