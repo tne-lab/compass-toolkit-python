@@ -1,7 +1,13 @@
+"""
+Translation of MATLAB code 'compass_em.m' to python
+by Sumedh Nagrale
+17th Sep 2023
+"""
+
 import numpy as np
 
 
-def BernoulliParam(p, e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb):
+def bernoulli_param(p, e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb):
     # replace param
     ek[e_fill_ind] = p[:len(e_fill_ind)]
     fk[f_fill_ind] = p[len(e_fill_ind):]
