@@ -16,6 +16,7 @@ compass_deviance.py
 
 compass_em.py
 
+compass_create_state_space.py
 
 # Optimization Algorithms 
 
