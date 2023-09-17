@@ -47,5 +47,5 @@ def gamma_param_full(p, Yn, obs_valid, ck, dk, MCk, xM, XSmt, SSmt, In, c_fill_i
             g1 = -((h0 ** (v - 1)) * np.exp(-h0)) / g0
             g2 = -g1 ** 2 + g1 * (((v - 1) / h0) - 1)
             gt = g2 * h0 * h0 + g1 * h0
-            f += np.log(gamma(v)) - np.log(g0) - 0.5 * ctk.dot(SSmt[t]).dot(ctk) * gt
+            f += np.log(gamma(v)) - np.log(g0) - 0.5 * ctk @ SSmt[t] @ ctk * gt
     return f
