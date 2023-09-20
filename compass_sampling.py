@@ -22,8 +22,8 @@ from scipy.stats import norm
 from scipy.stats import gamma
 
 
-# DISTR,Cut_Time,Uk,In,Ib,Param,XPos0,SPos0
-def compass_sampling(DISTR=None, Cut_Time=None, tIn=None, tParam=None, Ib=None, XPos0=None, SPos0=None):
+# DISTR,Cut_Time,Uk,In,Ib,Param,XPos0,SPos0 DISTR, censor_time, tUk, tIn, tIb, Param, XPre[k], SPre[k]
+def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None, Ib=None, XPos0=None, SPos0=None):
     """
     %% Input Argument
     % DISTR, a vecotr of two variables. The [1 0] means there is only normal
@@ -102,7 +102,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tIn=None, tParam=None, Ib=None, 
     # xMapping
     xM = tParam['xM']
     """Filtering Section"""
-    Uk = tParam['Uk']
+    Uk = tUk
     XPre = Ak @ XPos0 + Bk @ Uk.T
     SPre = Ak @ SPos0 @ Ak.T + Wk
 
@@ -127,7 +127,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tIn=None, tParam=None, Ib=None, 
         # YP, Sk
         EYn = np.exp(CTk @ XPre + DTk @ tIn.T)
         # Generate a sample - we assume it is scalar
-        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 * EYn * EYn) * 1/Vk), 0.01)
+        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 * EYn * EYn) * 1 / Vk), 0.01)
         ys = ys - S
         Pa = gamma.pdf(ys, a=EYn @ Vk, scale=np.linalg.inv(Vk))
         CPa = np.cumsum(Pa)
