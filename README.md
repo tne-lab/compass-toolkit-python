@@ -20,17 +20,11 @@ Converted scripts from MATLAB COMPASS toolkit - https://github.com/Eden-Kramer-L
       
       compass_em.py
             subfunctions-> bernoulli_param.py
-            
             subfunctions-> gamma_param_full.py
-            
             subfunctions-> gamma_param_minus_v.py
-            
             subfunctions-> gamma_param_minus_s.py
-            
             subfunctions-> gamma_param_cd.py
-            
             subfunctions-> normal_param_cdv.py
-            
             subfunctions-> normal_param_v.py
 
 # Optimization Algorithms 
