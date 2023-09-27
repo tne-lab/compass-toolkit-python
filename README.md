@@ -19,6 +19,9 @@ Converted scripts from MATLAB COMPASS toolkit - https://github.com/Eden-Kramer-L
       compass_set_learning_param.py
       
       compass_em.py
+      This is the code for expectation maximization which is used for parameter estimation. 
+      The problem with the current code has lot of redundancy which is carried from the matlab code.
+      The code can be condensed into a really shorter version so as to 1) improve readablity and 2) possible efficiency improvement. 
             subfunctions-> bernoulli_param.py
             subfunctions-> gamma_param_full.py
             subfunctions-> gamma_param_minus_v.py
