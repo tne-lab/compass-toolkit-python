@@ -20,8 +20,10 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
     """
     This function construct a dictionary (bc it's fast) that includes information of the overall setup.
     Equation:
-            X(K+1) = A X + B U
-            Y = f(X,I,v)
+            X(K+1) = A X(k) + B U(k) + W
+            X(0) ~ N(X0,W0)
+            Y = CT(k) X(k) + DT(k) + v
+            v ~ N(0,sig_v^2)
     Parameters:
     nx (int): Number of states for the state space equations. (in our context, x_baseline and x_conflict)
     nUk (int): Number of inputs to the continuous part of the model.
