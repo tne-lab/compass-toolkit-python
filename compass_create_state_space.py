@@ -1,34 +1,91 @@
-"""Translation of MATLAB code 'compass_create_state_space.m' to python 17 Nov 2022  Translated by Sumedh Nagrale
-1)removing the data argument and keeping it in lines with the compass matlab version, so that the documentation is
-easier to maintain.
-"""
+"""Translation of MATLAB code 'compass_create_state_space.m'
 
+Original Author: Sumedh Sopan Nagrale -- 17 Nov 2022
+Translated by Sumedh Sopan Nagrale from MATLAB code to python
+
+Updated:
+Author: Sumedh Sopan Nagrale
+1) Removing the data argument and keeping it in lines with the compass matlab version,
+so that the documentation is easier to maintain.
+
+Author: Sumedh Sopan Nagrale -- 04/01/2024 -- 4th Jan 2024
+1) Testing and conforming the validity of the code.
+2) The code has been shown to produce same outcome as in case of the MATLAB version
+"""
 import numpy as np
 
-def compass_create_state_space(nx, nUk, nIn, nIb, xM, cLink, cLinkUpdate, dLink, dLinkUpdate):
-    """Build The State-Space Model"""
+
+def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, cLink=None, cLinkUpdate=None, dLink=None,
+                               dLinkUpdate=None):
+    """
+    This function construct a dictionary (bc it's fast) that includes information of the overall setup.
+    Equation:
+            X(K+1) = A X + B U
+            Y = f(X,I,v)
+    Parameters:
+    nx (int): Number of states for the state space equations. (in our context, x_baseline and x_conflict)
+    nUk (int): Number of inputs to the continuous part of the model.
+    nIn (int): Indicator function.
+    nIb (int): Number of inputs to the discrete part of the model.
+    xM (int): relate the states with the observation process (for both discrete and continuous)
+    cLink (numpy array): here we consider tx states (tx < nx), Clink provides links the column of In to the states.
+    cLinkUpdate (numpy array): Determines which of the parameter associated needs to be updated.
+    dLink (numpy array): same as cLink but for discrete.
+    dLinkUpdate (numpy array): same as cLinkUpdate but for discrete.
+
+    Returns:
+    Param: A dictionary with information about all the parameters (keys).
+
+    Example: I
+        nx = 2
+        nUk = 12
+        nIn = 3
+        nIb = 0  # need to note this
+        # Reason note: This is assigned a number rather than empty bc the differences between the
+        xM = np.eye(2, 2)
+        cLink = np.array([1, 2])
+        cLinkUpdate = np.array([0, 0])
+        dLink = np.array([])
+        dLinkUpdate = np.array([])
+        print(compass_create_state_space(nx, nUk, nIn, nIb, xM, cLink, cLinkUpdate, dLink, dLinkUpdate))
+
+    Example: II
+    # MATLAB code
+    Param = compass_create_state_space(1,1,2,2,eye(1,1),1,1,1,0);
+    # Python code
+    compass_create_state_space(1, 1, 2, 2, np.eye(1, 1), np.array([1]), np.array([1]), np.array([1]), np.array([0]))
+
+    Example: III
+    # MATLAB code
+    Param = compass_create_state_space(2,1,3,3,eye(2,2),[1 2],[0 0],[1 2],[0 0]);
+    # Python code
+    compass_create_state_space(2, 1, 3, 3, np.eye(2, 2), np.array([1, 2]), np.array([0, 0]), np.array([1, 2]), np.array([0, 0]))
+    """
+
+    """Build The State-Space Model
+    """
     nc = 1
     nd = 1
     # don't need to get Param, it will be formed here
     Param = {}
     '''Dimension of Components'''
-    '''Size of X vector'''
+    '''Size of X state vector'''
     Param['nx'] = nx
-    Param['nc'] = 1
-    Param['nd'] = 1
+    Param['nc'] = nc
+    Param['nd'] = nd
 
     '''Input and Their Link Functions'''
     '''Input and its link to the continuous model'''
     Param['nIn'] = nIn  # Bias, I, V, I2C, C2I
 
     if cLink.size != 0 and cLinkUpdate.size != 0:
-        # not cLink[0] and not cLinkUpdate[0]:
         '''The cLinkMap - continuous link map'''
         Param['cLinkMap'] = np.zeros((nc, xM.shape[0]))
         Param['cLinkUpdate'] = np.zeros((nc, xM.shape[0]))
+        print(np.arange(0, nc, 1))
         for i in range(0, nc):
-            Param['cLinkMap'][i, :] = cLink[i, :]
-            Param['cLinkUpdate'][i, :] = cLinkUpdate[i, :]
+            Param['cLinkMap'][i, :] = cLink[i:]
+            Param['cLinkUpdate'][i, :] = cLinkUpdate[i:]
 
     ''' Input and its link to the discrete model'''
     Param['nIb'] = nIb  # Bias, I, V, I2C, C2I
@@ -42,7 +99,6 @@ def compass_create_state_space(nx, nUk, nIn, nIb, xM, cLink, cLinkUpdate, dLink,
 
     '''Model parameters'''
     '''Hidden state model'''
-    # removing the Param from here, since no update above and it's easier nx to read
     Param['Ak'] = np.eye(nx, nx) * 1
     Param['Bk'] = np.eye(nx, nUk) * 0.0  # INPUT
     Param['Wk'] = np.eye(nx, nx) * 0.05  # IID NOISE
@@ -51,16 +107,14 @@ def compass_create_state_space(nx, nUk, nIn, nIb, xM, cLink, cLinkUpdate, dLink,
 
     '''Continuous model'''
     Param['Ck'] = np.ones((nc, xM.shape[0]))  # Coefficients of the x
-    Param['Dk'] = np.eye(nc, nIn)  # Input parameters
+    Param['Dk'] = np.ones((nc, nIn))  # Input parameters
 
     '''we need to drop some input from update'''
     Param['cConstantUpdate'] = np.ones((nc, nIn))
     if cLink.size != 0 and cLinkUpdate.size != 0:
-        # not cLink[0] and not cLinkUpdate[0]:
         for i in range(0, nc):
             ind = np.argwhere(Param['cLinkMap'][i, :])
             if ind.size > 0:
-                # Param['cConstantUpdate'][i, Param['cLinkMap'][i, ind]] = 0
                 Param['cConstantUpdate'][i, ind] = 0
 
     Param['Vk'] = np.eye(nc, nc) * 0.01  # noise
@@ -71,17 +125,15 @@ def compass_create_state_space(nx, nUk, nIn, nIb, xM, cLink, cLinkUpdate, dLink,
 
     '''we need to drop some input from update'''
     if dLink.size != 0 and dLinkUpdate.size != 0:
-        # not dLink[0] and not dLinkUpdate[0]:
         Param['dConstantUpdate'] = np.ones((nd, Param['nIb']))
         for i in range(0, nd):
             ind = np.argwhere(Param['dLinkMap'][i, :])
             if ind.size > 0:
-                # Param['dConstantUpdate'][i, Param['dLinkMap'][i, ind]] = 0
                 Param['dConstantUpdate'][i, ind] = 0
     ''' xM is the X Mapping'''
     Param['xM'] = xM
 
-    ''' two extra paramaters for Gamma (Param.Vk is beging treated as Dispression)'''
+    ''' two extra parameters for Gamma (Param.Vk is being treated as dispersion)'''
     Param['S'] = 0
 
     ''' set censor_time + processing model'''
