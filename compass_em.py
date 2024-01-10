@@ -10,7 +10,6 @@ from scipy.special import gamma, gammainc
 
 
 def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=None, obs_valid=None):
-    # fminsearch
     global MFk, K, Ck, Dk, Vk, censor_time, Ek, Fk, MEk, pk, S, ck, dk, Yp
 
     ''' Input Argument
@@ -37,7 +36,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         % XPos is the filtering result - mean
         % SPos is the filtering result - variance
         % ML is the value of E-step maximization
-        % EYn is the prdiction of the Yn
+        % EYn is the prediction of the Yn
         % EYb is not added yet, but it can be the prediction of binary probability'''
 
     '''obs_valid has three values (0= MAR, 1=observed, 2= censored)'''
@@ -123,8 +122,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
     if DISTR[0] == 2:
         S = Param['S']
 
-    '''Check Uk'''
-    if not Uk:
+    '''Check Uk needs to check if the size is 0 or it's empty here'''
+    if Uk.size == 0:
         Uk = np.zeros((K, Bk.shape[1]))
 
     '''EM Update Loop'''
@@ -138,18 +137,19 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
     ''' ML array '''
     # ML = np.array(Param['Iter']) creates numpy array of single element
-    ML = [0] * Param['Iter']
+    ML = {}  # To get data each iteration #[0] * Param['Iter']
     # ML = np.zeros(Param['Iter'])
 
     ''' Main Loop '''
-    for iter in range(1, Param['Iter']):
+    for iter in range(1, Param['Iter'] + 1):
+        ML[iter] = {}
         # display iter
         # print(f"iteration {iter} out of {Param['Iter']}") python 3.6 and above
         print('iteration ', iter, ' out of ', Param['Iter'])
         '''Run the Filtering Part'''
-        '''One step perdiction mean'''
+        '''One step prediction mean'''
         XPre = [0] * K
-        '''One step perdiction covariance'''
+        '''One step prediction covariance'''
         SPre = [0] * K
         '''Filter mean'''
         XPos = [0] * K
@@ -493,9 +493,9 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                     pk * (1 - pk)))
                             # XPos
                             XPos[k] = XPre[k] + SPos[k] * (ETk.T @ (Yb[k] - pk) - Vk @ CTk.T @ (1 - Yk / Yp))
-                else:
-                    XPos[k] = XPre[k]
-                    SPos[k] = SPre[k]
+            else:
+                XPos[k] = XPre[k]
+                SPos[k] = SPre[k]
 
         ''' Smoother Part - it is based on classical Kalman Smoother'''
         # Kalman Smoothing
@@ -779,7 +779,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     upWk[d, d] = upWk[d, d] - 2 * (upBk[d, :] * Uk[k, :].T) @ temp[d]
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt0
-                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, :] * Uk[k, :].T) @ upAk[d, :] @ temp
+                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, :] * Uk[k, :].T) * upAk[d, :] @ temp
                 else:
                     # add E(Xk*Xk)
                     temp = Ckk[k]
@@ -839,7 +839,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     TempH = TempH - 2 * (Bk[d, :] @ Uk[k, :].T) * temp[d]
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt0
-                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) * (Ak[d, :] @ temp)
+                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) * (Ak[d, :] @ temp)  # sumedh
                 else:
                     # add E(Xk*Xk)
                     temp = Ckk[k]
@@ -854,10 +854,10 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     TempH = TempH - Ak[d, :] @ (temp[:, d] + temp[d, :].T)
                     # add -2*B*U*E(Xk)
                     temp = XSmt[k]
-                    TempH = TempH - 2 * (Bk[d, :] @ Uk[k, :].T) @ temp[d]
+                    TempH = TempH - 2 * ((Bk[d, :] @ Uk[k, :].T) * temp[d])  # sumedh
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt[k - 1]
-                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) @ (Ak[d, :] @ temp)
+                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) * (Ak[d, :] @ temp)  # sumedh
 
             MaxH = MaxH - 0.5 * TempH / Wk[d, d]
 
@@ -869,32 +869,36 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
             if Param["UpdateCModelParam"] == 1 and Param["UpdateCModelNoise"] == 1:
                 if any(Param['cLinkUpdate']) or any(MDk):
                     # generate index and matrixes for optimization
-                    c_fill_ind = np.where(Param['cLinkUpdate'])[0]
-                    ck = Ck
-                    d_fill_ind = np.where(MDk)[0]
-                    dk = Dk
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate']))  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk))  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
                     # initial parameters
-                    p0 = np.concatenate((Vk, ck[c_fill_ind], dk[d_fill_ind]))
+                    # sumedh number of initial guess is larger than the lower bounds
+                    p0 = np.concatenate((Vk[0], ck[c_fill_ind], dk[d_fill_ind]))
                     # define bounds
                     lower_bound = np.concatenate(([EPS], -1e3 * np.ones(len(p0) - 1)))
                     upper_bound = 1e3 * np.ones(len(p0))
 
                     result_multi = minimize(
-                        objFunc.normal_param_cdv,  # The objective function to minimize (provided as a reference)
+                        objFunc.normal_param_cdv.normal_param_cdv,  # The objective function to minimize (provided as
+                        # a reference)
                         p0,  # The initial guess for optimization
                         args=(ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
 
                     p_opt = result_multi.x
                     MaxO = -result_multi.fun
+
+                    # print([p_opt,MaxO])
                     print('Normal')
 
                     # put the estimates back to model
-                    Vk = p_opt[0]
-                    Ck[c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
-                    Dk[d_fill_ind] = p_opt[2 + len(c_fill_ind):]
+                    Vk[0] = p_opt[0]
+                    Ck[0][c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
+                    Dk[0][d_fill_ind] = p_opt[1 + len(c_fill_ind):]
                 else:
                     p0 = Vk
                     # define bounds
@@ -902,11 +906,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     upper_bound = 1e3
 
                     result_multi = minimize(
-                        objFunc.normal_param_v,  # The objective function to minimize (provided as a reference)
+                        objFunc.normal_param_v.normal_param_v,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
 
                     p_opt = result_multi.x
@@ -935,11 +939,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # call optimization function
 
                     result_multi = minimize(
-                        objFunc.normal_param_cd,  # The objective function to minimize (provided as a reference)
+                        objFunc.normal_param_cd.normal_param_cd,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
                     p_opt = result_multi.x
                     MaxO = -result_multi.fun
@@ -958,11 +962,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                 lower_bound = EPS
                 upper_bound = 1e3
                 result_multi = minimize(
-                    objFunc.normal_param_v,  # The objective function to minimize (provided as a reference)
+                    objFunc.normal_param_v.normal_param_v,  # The objective function to minimize (provided as a reference)
                     p0,  # The initial guess for optimization
                     args=(Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
                     # Additional arguments
-                    bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                    bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                 )
                 p_opt = result_multi.x
                 MaxO = -result_multi.fun
@@ -992,11 +996,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # options = optimoptions('lsqnonlin', 'Display', 'off', 'DiffMaxChange', 100, 'MaxIter', 1000)
 
                     result_multi = minimize(
-                        objFunc.gamma_param_full,  # The objective function to minimize (provided as a reference)
+                        objFunc.gamma_param_full.gamma_param_full,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(Yn, obs_valid, ck, dk, MCk, xM, XSmt, SSmt, In, c_fill_ind, d_fill_ind),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
                     p_opt = result_multi.x
                     MaxO = -result_multi.fun
@@ -1021,11 +1025,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # call optimization function
                     # options = optimoptions('lsqnonlin', 'Display', 'off', 'DiffMaxChange', 100, 'MaxIter', 1000)
                     result_multi = minimize(
-                        objFunc.gamma_param_minus_S,  # The objective function to minimize (provided as a reference)
+                        objFunc.gamma_param_minus_S.gamma_param_minus_S,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(Yn, S, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
                     p_opt = result_multi.x
                     MaxO = -result_multi.fun
@@ -1052,11 +1056,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # call optimization function
 
                     result_multi = minimize(
-                        objFunc.gamma_param_minus_v,  # The objective function to minimize (provided as a reference)
+                        objFunc.gamma_param_minus_v.gamma_param_minus_v,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(Yn, Vk, ck, dk, MCk, xM, In, XSmt, SSmt, c_fill_ind, d_fill_ind, obs_valid),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
                     p_opt = result_multi.x
                     MaxO = -result_multi.fun
@@ -1079,11 +1083,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         upper_bound = np.concatenate((1e3 * np.ones(len(c_fill_ind)), 1e3 * np.ones(len(d_fill_ind))))
                         # call optimization function
                         result_multi = minimize(
-                            objFunc.gamma_param_cd,  # The objective function to minimize (provided as a reference)
+                            objFunc.gamma_param_cd.gamma_param_cd,  # The objective function to minimize (provided as a reference)
                             p0,  # The initial guess for optimization
                             args=(Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In),
                             # Additional arguments
-                            bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                            bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                         )
                         p_opt = result_multi.x
                         MaxO = -result_multi.fun
@@ -1098,29 +1102,30 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
             if Param["UpdateDModelParam"] == 1:
                 if np.any(Param["dLinkUpdate"]) or np.any(MFk):
                     # generate index and matrices for optimization
-                    e_fill_ind = np.where(Param["dLinkUpdate"])[0]
-                    ek = Ek.copy()
-                    f_fill_ind = np.where(MFk)[0]
-                    fk = Fk.copy()
+                    e_fill_ind = np.where(np.squeeze(Param["dLinkUpdate"]))[0]
+                    ek = Ek[0]  # Ek.copy()
+                    f_fill_ind = np.where(np.squeeze(MFk))
+                    fk = np.squeeze(Fk)  # Fk.copy()
                     # initial parameters
                     p0 = np.concatenate([ek[e_fill_ind], fk[f_fill_ind]])
                     # define bounds
-                    lower_bound = 1e3 * np.ones(len(p0))
+                    lower_bound = -1e3 * np.ones(len(p0))
                     upper_bound = 1e3 * np.ones(len(p0))
                     # call optimization function
+                    # f = bernoulli_param(p0, e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb)
                     result_multi = minimize(
-                        objFunc.bernoulli_param,  # The objective function to minimize (provided as a reference)
+                        objFunc.bernoulli_param.bernoulli_param,  # The objective function to minimize (provided as a reference)
                         p0,  # The initial guess for optimization
                         args=(e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb),
                         # Additional arguments
-                        bounds=(lower_bound, upper_bound)  # Bounds for optimization as a tuple
+                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
                     )
                     p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    MaxB = -result_multi.fun
                     print('Bernoulli')
                     # put the estimates back to model
-                    Ek[e_fill_ind] = p_opt[:len(e_fill_ind)]
-                    Fk[f_fill_ind] = p_opt[len(e_fill_ind):]
+                    Ek[e_fill_ind] = p_opt[:len(e_fill_ind)] if len(p_opt[:len(e_fill_ind)]) > 0 else None
+                    Fk[0][f_fill_ind] = p_opt[len(e_fill_ind):] if len(p_opt[len(e_fill_ind):]) > 0 else None
         ML[iter]['Total'] = MaxH + MaxO + MaxB
         ML[iter]['State'] = MaxH
         ML[iter]['ObsrvNormGamma'] = MaxO
@@ -1146,41 +1151,4 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         if DISTR[0] == 2:
             Param['S'] = S
 
-    return K
-
-"""
-Param = {'UpdateMode': 1,
-         'XO': np.array([[0.], [0.]]),
-         'WO': np.array([[1., 0.], [0., 1.]]),
-         'censor_mode': 1,
-         'censor_time': 2,
-         'censor_update_mode': 1,
-         'Iter': 250,
-         'nd': 1,
-         'nIb': 1,
-         'xM': np.array([[1, 0], [0, 1]]),
-         'dLinkMap': np.array([[0, 1], [1, 1]]),
-         'dConstantUpdate': np.array([[0, 1, 1]]),
-         'Ak': np.array([[0.9999, 0], [0, 0.9999]]),
-         'Bk': np.array([[0.05, 0.06], [0.4, 0.9]]),
-         'Wk': np.array([[0.1107, 0], [0, 0.0607]]),
-         'Ck': np.array([[1, 1]]),
-         'Dk': np.array([[0, 0, 4.7672]]),
-         'Uk': np.array([[0, 0]]),
-         'nc': 1,
-         'nIn': 3,
-         'cLinkMap': np.array([[0, 1], [1, 1]]),
-         'cConstantUpdate': np.array([[0, 3, 1]]),
-         'Vk': 4.951167805469680,
-         'S': 0.10,
-         'Ek': np.array([[1, 1]]),
-         'Fk': np.array([[0, 0, 0]])
-         }
-"""
-"""
-print(compass_em(DISTR=[1, 0], Uk=np.array([[0.05, 0.06], [0.4, 0.9]]), In=np.array([[1, 0, 1], [1, 1, 1]]),
-                 Ib=np.array([[1, 0, 1]]),
-                 Yn=np.array([0.8, 1]),
-                 Yb=np.array([0.8, 1]), Param=Param,
-                 obs_valid=np.array([2, 0])))
-"""
+    return XSmt, SSmt, Param, XPos, SPos, ML, EYn, EYb, rYn, rYb
