@@ -39,11 +39,11 @@ def compass_Tk(tIn, tParam):
     numpy.ndarray: P matrix.
     """
     # Variables
-    cLinkMap = tParam['cLinkMap']
+    cLinkMap = tParam['cLinkMap'].astype(int)
     cConstantUpdate = tParam['cConstantUpdate']
 
     # Create a list of T matrices using a list comprehension
-    t_matrix = [np.where(cLinkMap, tIn[k, cLinkMap], 1.0) for k in range(len(tIn))]
+    t_matrix = np.array([np.where(cLinkMap, tIn[k, cLinkMap], 1) for k in range(len(tIn))])
 
     # Create the P matrix using NumPy operations
     p_matrix = np.where(cConstantUpdate, 1.0, 0.0)

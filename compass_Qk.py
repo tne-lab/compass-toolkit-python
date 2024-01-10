@@ -27,9 +27,9 @@ def compass_Qk(tIn=None, tParam=None):
     tParam.nx = number of hidden state
     tParam.dLinkMap, the link function between X and continuous variable
     """
-    dLinkMap = tParam['dLinkMap']
+    dLinkMap = int(tParam['dLinkMap'])
     dConstantUpdate = tParam['dConstantUpdate']
-    q_matrix = [np.where(dLinkMap, tIn[k, dLinkMap], 1.0) for k in range(len(tIn))]
+    q_matrix = np.array([np.where(dLinkMap, tIn[k, dLinkMap], 1.0) for k in range(len(tIn))])
     p_matrix = np.where(dConstantUpdate, 1.0, 0.0)
     return q_matrix, p_matrix
 
