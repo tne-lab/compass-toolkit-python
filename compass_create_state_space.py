@@ -11,6 +11,9 @@ so that the documentation is easier to maintain.
 Author: Sumedh Sopan Nagrale -- 04/01/2024 -- 4th Jan 2024
 1) Testing and conforming the validity of the code.
 2) The code has been shown to produce same outcome as in case of the MATLAB version
+
+Author: Sumedh Sopan Nagrale -- 08/01/2024 -- 8th Jan 2024
+1) Editing for the index, of clinkupdate
 """
 import numpy as np
 
@@ -82,6 +85,7 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
 
     if cLink.size != 0 and cLinkUpdate.size != 0:
         '''The cLinkMap - continuous link map'''
+        # this does not make sense to have a array of array
         Param['cLinkMap'] = np.zeros((nc, xM.shape[0]))
         Param['cLinkUpdate'] = np.zeros((nc, xM.shape[0]))
         print(np.arange(0, nc, 1))
@@ -96,8 +100,8 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
         Param['dLinkMap'] = np.zeros((nd, xM.shape[0]))
         Param['dLinkUpdate'] = np.zeros((nd, xM.shape[0]))
         for i in range(0, nd):
-            Param['dLinkMap'][i, :] = dLink[i]
-            Param['dLinkUpdate'][i, :] = dLinkUpdate[i]
+            Param['dLinkMap'][i, :] = dLink[i:]
+            Param['dLinkUpdate'][i, :] = dLinkUpdate[i:]
 
     '''Model parameters'''
     '''Hidden state model'''
@@ -112,12 +116,14 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
     Param['Dk'] = np.ones((nc, nIn))  # Input parameters
 
     '''we need to drop some input from update'''
+    """flawed logic, the logic depends on the language not a clear difference between logic and making use of the underlying structure"""
     Param['cConstantUpdate'] = np.ones((nc, nIn))
     if cLink.size != 0 and cLinkUpdate.size != 0:
         for i in range(0, nc):
             ind = np.argwhere(Param['cLinkMap'][i, :])
             if ind.size > 0:
-                Param['cConstantUpdate'][i, ind] = 0
+                cInd = (Param['cLinkMap'][i, ind]).ravel().astype(int) - 1 # adjusting the index
+                Param['cConstantUpdate'][i, cInd] = 0
 
     Param['Vk'] = np.eye(nc, nc) * 0.01  # noise
 
@@ -131,7 +137,8 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
         for i in range(0, nd):
             ind = np.argwhere(Param['dLinkMap'][i, :])
             if ind.size > 0:
-                Param['dConstantUpdate'][i, ind] = 0
+                dInd = ((Param['dLinkMap'][i, ind])).ravel().astype(int) - 1
+                Param['dConstantUpdate'][i, dInd] = 0
     ''' xM is the X Mapping'''
     Param['xM'] = xM
 
