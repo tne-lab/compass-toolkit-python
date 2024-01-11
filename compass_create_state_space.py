@@ -14,6 +14,9 @@ Author: Sumedh Sopan Nagrale -- 04/01/2024 -- 4th Jan 2024
 
 Author: Sumedh Sopan Nagrale -- 08/01/2024 -- 8th Jan 2024
 1) Editing for the index, of clinkupdate
+
+Author: Sumedh Sopan Nagrale -- 11/01/2024 -- 11th Jan 2024
+1) validation of the code and data structures that are used
 """
 import numpy as np
 
