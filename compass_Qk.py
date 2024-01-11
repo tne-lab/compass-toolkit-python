@@ -17,6 +17,10 @@ Following modifications were made to
 1. Removed the loops which were replaced by np.where
 2. Optimized the code for speed.
 3. Added variables separately
+
+11th Jan 2024
+Following modifications were made to
+1) Testing the code for validation
 """
 import numpy as np
 
