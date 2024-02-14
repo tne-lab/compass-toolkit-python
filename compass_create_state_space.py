@@ -111,21 +111,22 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
     Param['Ak'] = np.eye(nx, nx) * 1
     Param['Bk'] = np.eye(nx, nUk) * 0.0  # INPUT
     Param['Wk'] = np.eye(nx, nx) * 0.05  # IID NOISE
-    Param['XO'] = np.zeros((nx, 1))  # initial x0 is set to 0
-    Param['WO'] = np.eye(nx, nx) * 1  # initial x0 is set to 0
+    Param['X0'] = np.zeros((nx, 1))  # initial x0 is set to 0
+    Param['W0'] = np.eye(nx, nx) * 1  # initial x0 is set to 0
 
     '''Continuous model'''
     Param['Ck'] = np.ones((nc, xM.shape[0]))  # Coefficients of the x
     Param['Dk'] = np.ones((nc, nIn))  # Input parameters
 
     '''we need to drop some input from update'''
-    """flawed logic, the logic depends on the language not a clear difference between logic and making use of the underlying structure"""
+    """flawed logic, the logic depends on the language not a clear difference between logic and making use of the 
+    underlying structure """
     Param['cConstantUpdate'] = np.ones((nc, nIn))
     if cLink.size != 0 and cLinkUpdate.size != 0:
         for i in range(0, nc):
             ind = np.argwhere(Param['cLinkMap'][i, :])
             if ind.size > 0:
-                cInd = (Param['cLinkMap'][i, ind]).ravel().astype(int) - 1 # adjusting the index
+                cInd = (Param['cLinkMap'][i, ind]).ravel().astype(int)  # adjusting the index
                 Param['cConstantUpdate'][i, cInd] = 0
 
     Param['Vk'] = np.eye(nc, nc) * 0.01  # noise
@@ -140,7 +141,7 @@ def compass_create_state_space(nx=None, nUk=None, nIn=None, nIb=None, xM=None, c
         for i in range(0, nd):
             ind = np.argwhere(Param['dLinkMap'][i, :])
             if ind.size > 0:
-                dInd = ((Param['dLinkMap'][i, ind])).ravel().astype(int) - 1
+                dInd = ((Param['dLinkMap'][i, ind])).ravel().astype(int)
                 Param['dConstantUpdate'][i, dInd] = 0
     ''' xM is the X Mapping'''
     Param['xM'] = xM

@@ -1,4 +1,4 @@
-"""Translation of MATLAB code 'compass_create_state_space.m'
+"""Translation of MATLAB code 'compass_set_learning_param.m'
 
 Original Author: Sumedh Sopan Nagrale -- 17 Nov 2022
 Translated by Sumedh Sopan Nagrale from MATLAB code to python

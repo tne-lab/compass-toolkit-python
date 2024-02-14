@@ -36,7 +36,7 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
     Input '''
     Yn = []
     Yb = []
-    if DISTR(0) >= 1:
+    if DISTR[0] >= 1:
         [MCk, MDk] = Ctk.compass_Tk(In, Param)
         '''%% Normal Observation Model (  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik+Vk*iid white noise )
         % ------------------
@@ -46,16 +46,16 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
         % ------------------
         % Ck, NxM matrix - (Y is an observation of the length N, N can be 1, 2, ... - The Tk has the same size of input, 
         % and it is specfically designed for our task. It can be set to all 1 matrix)'''
-        Ck = Param['Ck']
+        Ck = np.copy(Param['Ck'])
         '''Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)'''
         Dk = Param['Dk'] * MDk
         '''Vk, is NxS4 matrix - (This is observation noise; for this, the S4 will be generally equal to N)'''
-        Vk = Param.Vk
+        Vk = np.copy(Param['Vk'])
         '''S'''
         if DISTR[0] == 2:
-            S = Param['S']
+            S = np.copy(Param['S'])
 
-    if DISTR(1) >= 1:
+    if DISTR[1] >= 1:
         [MEk, MFk] = Cqk.compass_Qk(Ib, Param)
         '''%% Binary Observation Model (  P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )
         % ------------------
@@ -64,14 +64,14 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
         % Qk is model specific function - it is original set to but a one matrix
         % ------------------
         % Ck, NxM matrix - similar to Ck, Tk'''
-        Ek = Param['Ek']
+        Ek = np.copy(Param['Ek'])
         '''Fk, NxS5 matrix - Similar to Dk'''
         Fk = Param['Fk'] * MFk
 
     '''State Space Model (  X(k+1)=Ak*X(k)+Bk*Uk+Wk*iid white noise ) xMapping'''
-    xM = Param['xM']
+    xM = np.copy(Param['xM'])
     '''Data observation: Normal'''
-    if DISTR(0) == 1:  # main observation is Normal
+    if DISTR[0] == 1:  # main observation is Normal
         # Filtering
         CTk = (Ck @ MCk[0]) @ xM
         DTk = Dk
@@ -82,13 +82,13 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
         if not Cut_Time:
             Yn = Yp + np.sqrt(Sk) @ np.randn()
         else:
-            ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk)), 0.01)
+            ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk)) + 0.01, 0.01)
             Pa = norm.pdf(ys, loc=Yp, scale=np.sqrt(Sk))
             CPa = np.cumsum(Pa)
             CPa = CPa / CPa[-1]
-            ui = np.argmin(np.abs(np.random.rand(1)- CPa))
-            Yn = ys(ui)
-    if DISTR(0) == 2:  # main observation is Gamma
+            ui = np.argmin(np.abs(np.random.rand(1) - CPa))
+            Yn = ys[ui]
+    if DISTR[0] == 2:  # main observation is Gamma
         # Filtering
         CTk = (Ck @ MCk[0]) @ xM
         DTk = Dk
@@ -97,28 +97,21 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
         if not Cut_Time:
             Yn = S + np.gamrnd(Vk, EYn / Vk)
         else:
-            ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 * EYn * EYn) * 1/Vk), 0.01)
+            ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, EYn + (5 * EYn * EYn) * 1 / Vk), 0.01)
             ys = ys - S
-            Pa = gamma.pdf(ys, a=EYn @ Vk, scale=np.linalg.inv(Vk))
+            Pa = gamma.pdf(ys, a=Vk, scale=EYn * np.linalg.inv(Vk))
             CPa = np.cumsum(Pa)
             CPa = CPa / CPa[-1]
             ui = np.argmin(np.abs(np.random.rand(1) - CPa))
-            Yn = S + ys(ui)
+            Yn = S + ys[ui]
 
-    if DISTR(1) == 1:
+    if DISTR[1] == 1:
         ETk = (Ek * MEk[0]) @ xM
         FTk = Fk
         # calculate p
         temp = ETk @ XSmt + FTk @ Ib.T
         pk = np.divide(np.exp(temp), (1 + np.exp(temp)))
         Yb = 0
-        if np.rand() < pk:
+        if np.random.rand(1) < pk:
             Yb = 1
-
-    # return variables
-    if DISTR[0] == 2 and DISTR[1] == 1:
-        return Yb, Yn
-    elif DISTR[0] == 2:
-        return Yn, np.array([])
-    elif DISTR[1] == 1:
-        return np.array([]), Yb
+    return Yn, Yb

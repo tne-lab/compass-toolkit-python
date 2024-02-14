@@ -2,16 +2,18 @@ import numpy as np
 import compass_Tk as Ctk
 import compass_Qk as Cqk
 import compass_sampling as Csam
-
+import fminsearchbnd as fin
 from subfunctions import obj_func as objFunc
 from scipy.optimize import minimize
-from scipy.stats import norm
-from scipy.special import gamma, gammainc
+from scipy.stats import norm, gamma
+from scipy.special import gammaincc
+
+from scipy.io import savemat
 
 
 def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=None, obs_valid=None):
     global MFk, K, Ck, Dk, Vk, censor_time, Ek, Fk, MEk, pk, S, ck, dk, Yp
-
+    ####################################Setup part################################################
     ''' Input Argument
         % DISTR, a vector of two variables. The [1 0] means there is only normal
         % observation/s, [0 1] means there is only binary observation/s, and [1 1]
@@ -40,11 +42,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         % EYb is not added yet, but it can be the prediction of binary probability'''
 
     '''obs_valid has three values (0= MAR, 1=observed, 2= censored)'''
-    EPS = np.finfo(np.float32).eps
+    EPS = np.finfo(np.float32).tiny  # np.spacing(1)  # np.finfo(np.float32).eps
     # math.nextafter(0, 1)
     MAX_EXP = 50
 
-    update_mode = Param['UpdateMode']
+    update_mode = np.copy(Param['UpdateMode'])
 
     '''Observation Mode, from 1 to 5'''
     if DISTR[0] == 1:
@@ -66,21 +68,21 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
     % Ak, Bk, Wk are model paramateres
     % ------------------
     % Ak, MxM matrix  (M is the length of the X)'''
-    Ak = Param['Ak']
+    Ak = np.copy(Param['Ak'])
     ''' Bk, MxS1 matrix (S1 is the length of Uk, Uk is a vector of size S1x1)'''
-    Bk = Param['Bk']
+    Bk = np.copy(Param['Bk'])
     '''Wk, is MxS2 matrix (S2 is the length of Noise, we normally set the noise with the same dimension as the X - 
     S2=M) '''
-    Wk = Param['Wk']
+    Wk = np.copy(Param['Wk'])
     '''X0, is a Mx1 matrix (initial value of X0)'''
-    X0 = Param['XO']
-    W0 = Param['WO']
+    X0 = np.copy(Param['X0'])
+    W0 = np.copy(Param['W0'])
     ''' This is extending x'''
-    xM = Param['xM']
+    xM = np.copy(Param['xM'])
 
     '''Censored Reaction Time'''
     if 2 in obs_valid:
-        censor_time = Param['censor_time']
+        censor_time = np.copy(Param['censor_time'])
         Yn[obs_valid != 1] = censor_time
 
     '''Normal/Gamma Observation Model'''
@@ -95,11 +97,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         % ------------------
         % Ck, 1xM matrix - (Y is an scalar observation at each time point ... - The Tk has the same size of input,
         % and it is specfically designed for our task. It can be set to all 1 matrix)'''
-        Ck = Param['Ck']
+        Ck = np.copy(Param['Ck'])
         ''' Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)'''
         Dk = Param['Dk'] * MDk
         ''' Vk, is scaler represnting noise in Normal or Dispresion Term in Gamma'''
-        Vk = Param['Vk']
+        Vk = np.copy(Param["Vk"])
 
         ''' Length of data '''
         K = len(Yn)
@@ -112,7 +114,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         % Qk is model specific function - it is original set to but a one matrix
         % ------------------'''
         ''' Ck, NxM matrix - similar to Ck, Tk'''
-        Ek = Param['Ek']
+        Ek = np.copy(Param['Ek'])
         ''' Fk, NxS5 matrix - Similar to Dk'''
         Fk = Param['Fk'] * MFk
         '''Length of data'''
@@ -120,7 +122,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
     ''' Gamma, Extra Parameter - Time Shift'''
     if DISTR[0] == 2:
-        S = Param['S']
+        S = Param['S'] * 1
 
     '''Check Uk needs to check if the size is 0 or it's empty here'''
     if Uk.size == 0:
@@ -139,7 +141,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
     # ML = np.array(Param['Iter']) creates numpy array of single element
     ML = {}  # To get data each iteration #[0] * Param['Iter']
     # ML = np.zeros(Param['Iter'])
-
+    ####################################EM loop################################################
     ''' Main Loop '''
     for iter in range(1, Param['Iter'] + 1):
         ML[iter] = {}
@@ -148,60 +150,52 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         print('iteration ', iter, ' out of ', Param['Iter'])
         '''Run the Filtering Part'''
         '''One step prediction mean'''
-        XPre = [0] * K
+        XPre = [np.array([[0]]) for _ in range(K)]  # [0] * K
         '''One step prediction covariance'''
-        SPre = [0] * K
+        SPre = [np.array([[0]]) for _ in range(K)]  # [0] * K
         '''Filter mean'''
-        XPos = [0] * K
+        XPos = [np.array([[0]]) for _ in range(K)]  # [[0]] * K
         '''Filter covariance'''
-        SPos = [0] * K
-
+        SPos = [np.array([[0]]) for _ in range(K)]  # [[0]] * K
         # Filter
         for k in range(0, K):
-            # One step prediction
+            # One-step prediction
             if k == 0:
                 XPre[k] = Ak @ X0 + Bk @ Uk[k, :].T
                 SPre[k] = Ak @ W0 @ Ak.T + Wk
             else:
-                # XPre[k - 1] = Ak @ XPos[k - 2] + Bk @ Uk[k - 1, :].T
                 XPre[k] = Ak @ XPos[k - 1] + Bk @ Uk[k, :].T
-                # SPre[k - 1] = Ak @ SPos[k - 2] @ Ak.T + Wk
                 SPre[k] = Ak @ SPos[k - 1] @ Ak.T + Wk
-
             # Check if the data point is censored or not
             if obs_valid[k]:
                 # Draw a sample if it is censored in censor_mode 1 (sampling)
                 if obs_valid[k] == 2 and Param['censor_mode'] == 1:
-                    tIn = []
-                    tIb = []
-                    tUk = []
+                    tIn, tIb, tUk = [], [], []
                     if DISTR[0]:
-                        tIn = In[k, :]
+                        tIn = In[k, :].reshape((1, -1))
                     if DISTR[1]:
-                        tIb = Ib[k, :]
+                        tIb = Ib[k, :].reshape((1, -1))
                     if Uk.size != 0:
                         tUk = Uk[k, :]
-                    tYP, tYB = Csam.compass_sampling(DISTR, censor_time, tUk, tIn, tIb, Param, XPre[k], SPre[k])
+                    tYP, tYB = Csam.compass_sampling(DISTR, censor_time, tUk, tIn, Param, tIb, XPre[k], SPre[k])
 
                     if DISTR[0]:
                         Yn[k] = tYP
                     if DISTR[1]:
                         Yb[k] = tYB
-
                 '''  Observation: Normal '''
                 if observe_mode == 1:
                     CTk = (Ck * MCk[k]) @ xM
                     DTk = Dk
                     if obs_valid[k] == 2 and Param['censor_mode'] == 2:
                         # censor time
-                        T = Param['censor_time']
+                        T = np.copy(Param['censor_time'])
                         if Param['censor_update_mode'] == 1:
                             # SPos Update first
-                            Mx = CTk * XPre[k] + DTk * In[k, :].T
-                            Lx = np.maximum(EPS, norm.cdf(Yn[k], Mx, np.sqrt(Vk), loc=0, scale=1, method='upper'))
+                            Mx = CTk * XPre[k] + DTk @ In[k, :].T
+                            Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx  # likelihood is not zero to avoid division by zero when computing Tx.
-
                             # Calculate SPos
                             Hx = (Yn[k] - Mx) / Vk
                             Sc = (CTk.T @ CTk) @ Tx * (Tx - Hx)
@@ -215,7 +209,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             xpos = XPre[k]
                             for h in range(in_loop):
                                 Mx = CTk @ xpos + DTk @ In[k, :].T
-                                Lx = np.maximum(EPS, norm.cdf(Yn[k], Mx, np.sqrt(Vk), loc=0, scale=1, method='upper'))
+                                Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                                 Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                                 Tx = Gx / Lx
                                 # update rule
@@ -224,7 +218,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
                             XPos[k] = xpos
                             Mx = CTk @ xpos + DTk @ In[k, :].T
-                            Lx = np.maximum(EPS, norm.cdf(Yn[k], Mx, np.sqrt(Vk), loc=0, scale=1, method='upper'))
+                            Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
 
@@ -265,7 +259,6 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         pk = np.exp(st) / (1 + np.exp(st))
                         SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + ETk.T @ np.diag(pk * (1 - pk)) @ ETk)
                         XPos[k] = XPre[k] + SPos[k] * ETk.T @ (Yb[k] - pk)
-
                 # Observation: Normal+Bernoulli
                 if observe_mode == 3:
                     CTk = (Ck * MCk[k]) @ xM
@@ -274,12 +267,12 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     FTk = Fk
                     if obs_valid[k] == 2 and Param["censor_mode"] == 2:
                         # This is exactly the same for Normal distribution censor time
-                        T = Param["censor_mode"]
+                        T = np.copy(Param["censor_time"])
                         # update mode 1
                         if Param["censor_update_mode"] == 1:
                             # SPos Update first
                             Mx = CTk @ XPre[k] + DTk @ In[k, :].T
-                            Lx = np.maximum(EPS, norm.cdf(Yn[k], Mx, np.sqrt(Vk), 'upper'))
+                            Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
                             # Update S
@@ -295,7 +288,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             xpos = XPre[k]
                             for h in range(in_loop):
                                 Mx = CTk @ xpos + DTk @ In[k, :].T
-                                Lx = np.maximum(EPS, norm.cdf(Yn[k], Mx, np.sqrt(Vk), 'upper'))
+                                Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                                 Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                                 Tx = Gx / Lx
                                 # S update
@@ -303,7 +296,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 xpos = XPre[k] + SPre[k] * Ac
                             XPos[k] = xpos
                             Mx = CTk @ xpos + DTk @ In[k, :].T
-                            Lx = np.maximum(EPS, norm.cdf(T, Mx, np.sqrt(Vk), 'upper'))
+                            Lx = np.maximum(EPS, norm.sf(T, loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(T, Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
                             # SPos update next
@@ -341,7 +334,6 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             XPos[k] = XPre[k] + SPos[k] * (
                                     ETk.T @ (Yb[k] - pk) + CTk.T @ (Yn[k] - Yp) @ np.linalg.inv(Vk)
                             )
-
                 # Observation: Gamma
                 if observe_mode == 4:
                     CTk = (Ck * MCk[k]) @ xM
@@ -355,8 +347,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
                             Hx = (Yn[k] - S) @ Vk / Mx
                             # components to estimate posterior
-                            Lx = np.maximum(EPS, gammainc(Hx, Vk, 'upper'))
-                            Gx = gamma.pdf(Hx, Vk, 1)
+                            Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                            Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                             # temporary
                             Ta = Gx / Lx
                             # variace update
@@ -374,8 +366,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
                                 Hx = (Yn[k] - S) @ Vk / Mx
                                 # components to estimate posterior
-                                Lx = np.maximum(EPS, gammainc(Hx, Vk, 'upper'))
-                                Gx = gamma.pdf(Hx, Vk, 1)
+                                Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                                Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                                 # temporary
                                 Ta = Gx / Lx
                                 # XPos Update next
@@ -385,8 +377,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
                             Hx = (Yn[k] - S) * Vk / Mx
                             # components to estimate posterior
-                            Lx = np.maximum(EPS, gammainc(Hx, Vk, 'upper'))
-                            Gx = gamma.pdf(Hx, Vk, 1)
+                            Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                            Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                             # temporary
                             Ta = Gx / Lx
                             # variace update
@@ -411,7 +403,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + (Vk * (Yk / Yp)) * CTk.T @ CTk)
                             XPos[k] = XPre[k] - SPos[k] * Vk @ CTk.T @ (1 - Yk / Yp)
                 # Observation: Gamma + Bernoulli
-                if observe_mode == 5:
+                if observe_mode == 6:
                     CTk = Ck * MCk[k] @ xM
                     DTk = Dk
                     ETk = Ek * MEk[k] @ xM
@@ -423,8 +415,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
                             Hx = (Yn[k] - S) @ Vk / Mx
                             # components to estimate posterior
-                            Lx = np.maximum(EPS, gammainc(Hx, Vk, upper=True))
-                            Gx = gamma.pdf(Hx, Vk, scale=1)
+                            Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                            Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                             # temporary
                             Ta = Gx / Lx
                             # variance update
@@ -442,8 +434,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
                                 Hx = (Yn[k] - S) @ Vk / Mx
                                 # components to estimate posterior
-                                Lx = np.maximum(EPS, gammainc(Hx, Vk, upper=True))
-                                Gx = gamma.pdf(Hx, Vk, scale=1)
+                                Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                                Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                                 # temporary
                                 Ta = Gx / Lx
                                 # XPos Update next
@@ -454,8 +446,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
                             Hx = (Yn[k] - S) * Vk / Mx
                             # components to estimate posterior
-                            Lx = np.maximum(EPS, gammainc(Hx, Vk, upper=True))
-                            Gx = gamma.pdf(Hx, Vk, scale=1)
+                            Lx = np.maximum(EPS, gammaincc(Vk, Hx))
+                            Gx = gamma.pdf(Hx, Vk, loc=0, scale=1)
                             # temporary
                             Ta = Gx / Lx
                             # variance update
@@ -494,17 +486,18 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             # XPos
                             XPos[k] = XPre[k] + SPos[k] * (ETk.T @ (Yb[k] - pk) - Vk @ CTk.T @ (1 - Yk / Yp))
             else:
+                # randomly censored, the filter estimate will be equal to one-step prediction
                 XPos[k] = XPre[k]
                 SPos[k] = SPre[k]
 
         ''' Smoother Part - it is based on classical Kalman Smoother'''
         # Kalman Smoothing
-        As = [0] * K
+        As = [np.array([[0]]) for _ in range(K)]  # [0] * K
         # posterior mean
-        XSmt = [0] * K
+        XSmt = [np.array([[0]]) for _ in range(K)]  # [0] * K
         XSmt[-1] = XPos[-1]
         # posterior variance
-        SSmt = [0] * K
+        SSmt = [np.array([[0]]) for _ in range(K)]  # [0] * K
         SSmt[-1] = SPos[-1]
         for k in range(K - 2, -1, -1):
             # Ak, equation (A.10)
@@ -521,7 +514,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
         # Extra Component of the State Prediction Ckk = E(Xk*Xk)
         # Ckk = E(Xk*Xk) prediction by smoothing
-        Ckk = [0] * K
+        Ckk = [np.array([[0]]) for _ in range(K)]  # [0] * K
         for k in range(K):
             # Wk update - Smoothing Xk*Xk
             Ckk[k] = SSmt[k] + XSmt[k] @ XSmt[k].T
@@ -531,8 +524,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         # Ckk_1=E(Xk-1*Xk) prediction by smoothing - it is kept at index K
         # Wkk_1= Ckk_1 + Bias
         # Covariance for smoothed estimates in state space models - Biometrica 1988-601-602
-        Ckk_1 = [0] * K
-        Wkk_1 = [0] * K
+        Ckk_1 = [np.array([[0]]) for _ in range(K)]  # [0] * K
+        Wkk_1 = [np.array([[0]]) for _ in range(K)]  # [0] * K
         for k in range(K):
             # Wkk update - Smoothing Xk-1*Xk
             if k > 0:
@@ -867,245 +860,270 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
             # replace unobserved points with censored threshold
             # if we update all parameters of the model
             if Param["UpdateCModelParam"] == 1 and Param["UpdateCModelNoise"] == 1:
-                if any(Param['cLinkUpdate']) or any(MDk):
+                if any(Param['cLinkUpdate']) or any(MDk[0]):
                     # generate index and matrixes for optimization
-                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate']))  # sumedh removed [0]
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
                     ck = Ck[0]
-                    d_fill_ind = np.where(np.squeeze(MDk))  # sumedh removed [0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
                     dk = np.squeeze(Dk)
                     # initial parameters
                     # sumedh number of initial guess is larger than the lower bounds
                     p0 = np.concatenate((Vk[0], ck[c_fill_ind], dk[d_fill_ind]))
+
                     # define bounds
                     lower_bound = np.concatenate(([EPS], -1e3 * np.ones(len(p0) - 1)))
                     upper_bound = 1e3 * np.ones(len(p0))
 
-                    result_multi = minimize(
-                        objFunc.normal_param_cdv.normal_param_cdv,  # The objective function to minimize (provided as
-                        # a reference)
-                        p0,  # The initial guess for optimization
-                        args=(ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
+                    # result_multi = minimize(
+                    #     objFunc.normal_param_cdv.normal_param_cdv,  # The objective function to minimize (provided as
+                    #     # a reference)
+                    #     p0,  # The initial guess for optimization
+                    #     args=(ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
+                    #     # Additional arguments
+                    #     bounds=list(zip(lower_bound, upper_bound)),  # Bounds for optimization as a tuple
+                    #     method='TNC'
+                    # )
+                    #
+                    # p_opt = result_multi.x
+                    # MaxO = -result_multi.fun
 
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    result_multi = fin.fminsearchbnd(objFunc.normal_param_cdv.normal_param_cdv,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In,
+                                                     SSmt)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
 
-                    # print([p_opt,MaxO])
+                    print([p_opt, MaxO])
                     print('Normal')
 
                     # put the estimates back to model
                     Vk[0] = p_opt[0]
                     Ck[0][c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
+                    print(p_opt, MaxO)
                     Dk[0][d_fill_ind] = p_opt[1 + len(c_fill_ind):]
                 else:
-                    p0 = Vk
+                    p0 = Vk[0]
                     # define bounds
-                    lower_bound = EPS
-                    upper_bound = 1e3
-
-                    result_multi = minimize(
-                        objFunc.normal_param_v.normal_param_v,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    # call optimization function
+                    lower_bound = np.finfo(np.float64).eps * np.ones(1)
+                    upper_bound = 1e3 * np.ones(1)
+                    # call optimization function
+                    result_multi = fin.fminsearchbnd(objFunc.normal_param_v.normal_param_v,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
                     print('Normal')
 
                     ck = Ck
                     dk = Dk
 
                     # put the estimates back to model
-                    Vk = p_opt[0]
+                    Vk[0] = p_opt[0]
 
             # if we only update Parameters of the model
             if Param["UpdateCModelParam"] == 1 and Param["UpdateCModelNoise"] == 0:
                 if len(np.nonzero(Param["cLinkUpdate"])[0]) != 0 or len(np.nonzero(MDk)[0]) != 0:
-                    # generate index and matrices for optimization
-                    c_fill_ind = np.nonzero(Param["cLinkUpdate"])[0]
-                    ck = Ck.copy()
-                    d_fill_ind = np.nonzero(MDk)[0]
-                    dk = Dk.copy()
                     # initial parameters
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
                     p0 = np.concatenate((ck[c_fill_ind], dk[d_fill_ind]))
                     # define bounds
-                    lower_bound = 1e3 * np.ones(len(p0))
+                    lower_bound = -1e3 * np.ones(len(p0))
                     upper_bound = 1e3 * np.ones(len(p0))
                     # call optimization function
-
-                    result_multi = minimize(
-                        objFunc.normal_param_cd.normal_param_cd,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    result_multi = fin.fminsearchbnd(objFunc.normal_param_cd.normal_param_cd,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn, XSmt,
+                                                     In, SSmt)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
                     print('Normal')
-                    sv = Vk.copy()
+
+                    sv = Vk[0]
 
                     # put the estimates back to the model
-                    Ck[c_fill_ind] = p_opt[:len(c_fill_ind)]
-                    Dk[d_fill_ind] = p_opt[1 + len(c_fill_ind):]
+                    Ck[0][c_fill_ind] = p_opt[0:0 + len(c_fill_ind)]
+                    Dk[0][d_fill_ind] = p_opt[0 + len(c_fill_ind):]
             # if we only update Noise Term
             if Param["UpdateCModelParam"] == 0 and Param["UpdateCModelNoise"] == 1:
-                p0 = Vk.copy()
+                p0 = Vk[0]
                 # define bounds
 
                 # call optimization function
-                lower_bound = EPS
-                upper_bound = 1e3
-                result_multi = minimize(
-                    objFunc.normal_param_v.normal_param_v,  # The objective function to minimize (provided as a reference)
-                    p0,  # The initial guess for optimization
-                    args=(Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt),
-                    # Additional arguments
-                    bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                )
-                p_opt = result_multi.x
-                MaxO = -result_multi.fun
+                lower_bound = np.finfo(np.float64).eps * np.ones(1)
+                upper_bound = 1e3 * np.ones(1)
+                # call optimization function
+                result_multi = fin.fminsearchbnd(objFunc.normal_param_v.normal_param_v,
+                                                 p0,
+                                                 lower_bound,
+                                                 upper_bound,
+                                                 None,  # options
+                                                 Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt)
+                p_opt = result_multi[0]
+                temp = result_multi[1]
+                MaxO = -temp
                 print('Normal')
 
-                ck = Ck.copy()
-                dk = Dk.copy()
+                ck = Ck
+                dk = Dk
 
                 # put the estimates back to the model
-                Vk = p_opt[0]
+                Vk[0] = p_opt[0]
 
         if observe_mode == 4 or observe_mode == 5:
             # continuous parameters update
             if Param["UpdateCModelParam"] == 1:
                 if Param["UpdateCModelNoise"] and Param["UpdateCModelShift"]:  # Full model update
                     # keep learning param
-                    c_fill_ind = np.where(Param["cLinkUpdate"])[0]
-                    ck = Ck
-                    d_fill_ind = np.where(MDk == 1)[0]
-                    dk = Dk
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
                     # initiate parameters
-                    p0 = [Vk, S, list(ck[c_fill_ind]), list(dk[d_fill_ind])]
+                    p0 = np.concatenate((Vk[0],[S], ck[c_fill_ind], dk[d_fill_ind]))
+                    #p0 = [Vk, S, list(ck[c_fill_ind]), list(dk[d_fill_ind])]
                     # lower and upper bound (dispersion Shift Ck Dk)
-                    lower_bound = [1, 0, -1e3 * len(c_fill_ind), [-1e3] * len(d_fill_ind)]
-                    upper_bound = [50, 0.99 * np.min(Yn), [1e3] * len(c_fill_ind), [1e3] * len(d_fill_ind)]
+                    lower_bound = np.concatenate(([1], [0], -1e3 * np.ones_like(c_fill_ind), -1e3 * np.ones_like(d_fill_ind)))
+                    upper_bound = np.concatenate(([50], [0.99 * np.min(Yn)], 1e3 * np.ones_like(c_fill_ind), 1e3 * np.ones_like(d_fill_ind)))
                     # call optimization function
                     # options = optimoptions('lsqnonlin', 'Display', 'off', 'DiffMaxChange', 100, 'MaxIter', 1000)
-
-                    result_multi = minimize(
-                        objFunc.gamma_param_full.gamma_param_full,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(Yn, obs_valid, ck, dk, MCk, xM, XSmt, SSmt, In, c_fill_ind, d_fill_ind),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    # call optimization function
+                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_full.gamma_param_full,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     Yn, obs_valid, ck, dk, MCk, xM, XSmt, SSmt, In, c_fill_ind,
+                                                     d_fill_ind)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
                     print('Gamma')
                     # update param
-                    Vk = p_opt[0]
+                    Vk[0] = p_opt[0]
                     S = p_opt[1]
-                    Ck[c_fill_ind] = p_opt[2:2 + len(c_fill_ind)]
-                    Dk[d_fill_ind] = p_opt[3 + len(c_fill_ind):]
+                    Ck[0][c_fill_ind] = p_opt[1:2 + len(c_fill_ind)]
+                    print(p_opt, MaxO)
+                    Dk[0][d_fill_ind] = p_opt[2 + len(c_fill_ind):]
 
                 elif Param["UpdateCModelNoise"]:  # Update Ck,Dk, plus V
                     # keep learning param
-                    c_fill_ind = np.where(Param["cLinkUpdate"])[0]
-                    ck = Ck
-                    d_fill_ind = np.where(MDk == 1)[0]
-                    dk = Dk
-                    # initiate p0
-                    p0 = [Vk] + list(ck[c_fill_ind]) + list(dk[d_fill_ind])
-                    # lower and upper bound (disperssion Shift Ck Dk)
-                    lower_bound = [1, [-1e3] * len(c_fill_ind), [-1e3] * len(d_fill_ind)]
-                    upper_bound = [50, [1e3] * len(c_fill_ind), [1e3] * len(d_fill_ind)]
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
+                    # initial parameters
+                    # sumedh number of initial guess is larger than the lower bounds
+                    p0 = np.concatenate((Vk[0], ck[c_fill_ind], dk[d_fill_ind]))
+
+                    # lower and upper bound (dispersion Shift Ck Dk)
+                    lower_bound = np.concatenate(
+                        ([1], -1e3 * np.ones_like(c_fill_ind), -1e3 * np.ones_like(d_fill_ind)))
+                    upper_bound = np.concatenate(([50], 1e3 * np.ones_like(c_fill_ind), 1e3 * np.ones_like(d_fill_ind)))
                     # call optimization function
-                    # options = optimoptions('lsqnonlin', 'Display', 'off', 'DiffMaxChange', 100, 'MaxIter', 1000)
-                    result_multi = minimize(
-                        objFunc.gamma_param_minus_S.gamma_param_minus_S,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(Yn, S, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_minus_S.gamma_param_minus_S,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     ck, dk, c_fill_ind, d_fill_ind, obs_valid, MCk, xM, Yn, XSmt, In,
+                                                     SSmt, S)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
                     print('Gamma')
                     # update param
-                    Vk = p_opt[0]
-                    Ck[c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
-                    Dk[d_fill_ind] = p_opt[2 + len(c_fill_ind):]
+                    Vk[0] = p_opt[0]
+                    Ck[0][c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
+                    print(p_opt, MaxO)
+                    Dk[0][d_fill_ind] = p_opt[1 + len(c_fill_ind):]
 
-                if Param["UpdateCModelShift"]:
+                elif Param["UpdateCModelShift"]:
                     # Update Ck, Dk, plus Shift
                     # keep learning param
-                    c_fill_ind = np.where(Param["cLinkUpdate"])[0]
-                    ck = Ck.copy()
-                    d_fill_ind = np.where(MDk == 1)[0]
-                    dk = Dk.copy()
-                    # initiate p0
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
+                    # initial parameters
+                    # sumedh number of initial guess is larger than the lower bounds
                     p0 = np.concatenate(([S], ck[c_fill_ind], dk[d_fill_ind]))
-                    # lower and upper bound (disperssion Shift Ck Dk)
+                    # lower and upper bound (dispersion Shift Ck Dk)
                     lower_bound = np.concatenate(
-                        ([0], -1e3 * np.ones(len(c_fill_ind)), -1e3 * np.ones(len(d_fill_ind))))
+                        ([0], -1e3 * np.ones_like(c_fill_ind), -1e3 * np.ones_like(d_fill_ind)))
                     upper_bound = np.concatenate(
-                        ([0.99 * np.min(Yn)], 1e3 * np.ones(len(c_fill_ind)), 1e3 * np.ones(len(d_fill_ind))))
-                    # call optimization function
-
-                    result_multi = minimize(
-                        objFunc.gamma_param_minus_v.gamma_param_minus_v,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(Yn, Vk, ck, dk, MCk, xM, In, XSmt, SSmt, c_fill_ind, d_fill_ind, obs_valid),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-                    p_opt = result_multi.x
-                    MaxO = -result_multi.fun
+                        ([0.99 * np.min(Yn)], 1e3 * np.ones_like(c_fill_ind), 1e3 * np.ones_like(d_fill_ind)))
+                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_minus_v.gamma_param_minus_v,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     Yn, Vk, ck, dk, MCk, xM, In, XSmt, SSmt, c_fill_ind, d_fill_ind,
+                                                     obs_valid)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxO = -temp
                     print('Gamma')
                     # update param
                     S = p_opt[0]
-                    Ck[c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
-                    Dk[d_fill_ind] = p_opt[2 + len(c_fill_ind):]
+                    Ck[0][c_fill_ind] = p_opt[1:1 + len(c_fill_ind)]
+                    print(p_opt, MaxO)
+                    Dk[0][d_fill_ind] = p_opt[1 + len(c_fill_ind):]
                 else:
                     # keep learning param
-                    c_fill_ind = np.where(Param["cLinkUpdate"])[0]
-                    ck = Ck.copy()
-                    d_fill_ind = np.where(MDk == 1)[0]
-                    dk = Dk.copy()
+                    c_fill_ind = np.where(np.squeeze(Param['cLinkUpdate'][0]))[0]  # sumedh removed [0]
+                    ck = Ck[0]
+                    d_fill_ind = np.where(np.squeeze(MDk[0]))[0]  # sumedh removed [0]
+                    dk = np.squeeze(Dk)
                     # initiate p0
                     p0 = np.concatenate((ck[c_fill_ind], dk[d_fill_ind]))
-                    if not p0:
+                    if np.any(p0):
                         # lower and upper bound (disperssion Shift Ck Dk)
                         lower_bound = np.concatenate((-1e3 * np.ones(len(c_fill_ind)), -1e3 * np.ones(len(d_fill_ind))))
                         upper_bound = np.concatenate((1e3 * np.ones(len(c_fill_ind)), 1e3 * np.ones(len(d_fill_ind))))
                         # call optimization function
-                        result_multi = minimize(
-                            objFunc.gamma_param_cd.gamma_param_cd,  # The objective function to minimize (provided as a reference)
-                            p0,  # The initial guess for optimization
-                            args=(Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In),
-                            # Additional arguments
-                            bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                        )
-                        p_opt = result_multi.x
-                        MaxO = -result_multi.fun
+                        result_multi = fin.fminsearchbnd(objFunc.gamma_param_cd.gamma_param_cd,
+                                                         p0,
+                                                         lower_bound,
+                                                         upper_bound,
+                                                         None,  # options
+                                                         Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM,
+                                                         XSmt, SSmt, In)
+                        p_opt = result_multi[0]
+                        temp = result_multi[1]
+                        MaxO = -temp
                         print('Gamma')
                         # update param
-                        Ck[c_fill_ind] = p_opt[:len(c_fill_ind)]
-                        Dk[d_fill_ind] = p_opt[len(c_fill_ind):]
+                        Ck[0][c_fill_ind] = p_opt[:len(c_fill_ind)]
+                        print(p_opt, MaxO)
+                        Dk[0][d_fill_ind] = p_opt[0 + len(c_fill_ind):]
 
-        #  Estimate Discrete Componentns
+        #  Estimate Discrete Components
         MaxB = 0
         if DISTR[1] == 1:
             if Param["UpdateDModelParam"] == 1:
                 if np.any(Param["dLinkUpdate"]) or np.any(MFk):
                     # generate index and matrices for optimization
                     e_fill_ind = np.where(np.squeeze(Param["dLinkUpdate"]))[0]
-                    ek = Ek[0]  # Ek.copy()
+                    ek = Ek[0]
                     f_fill_ind = np.where(np.squeeze(MFk))
-                    fk = np.squeeze(Fk)  # Fk.copy()
+                    fk = np.squeeze(Fk)
                     # initial parameters
                     p0 = np.concatenate([ek[e_fill_ind], fk[f_fill_ind]])
                     # define bounds
@@ -1113,16 +1131,18 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     upper_bound = 1e3 * np.ones(len(p0))
                     # call optimization function
                     # f = bernoulli_param(p0, e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb)
-                    result_multi = minimize(
-                        objFunc.bernoulli_param.bernoulli_param,  # The objective function to minimize (provided as a reference)
-                        p0,  # The initial guess for optimization
-                        args=(e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb),
-                        # Additional arguments
-                        bounds=list(zip(lower_bound, upper_bound))  # Bounds for optimization as a tuple
-                    )
-                    p_opt = result_multi.x
-                    MaxB = -result_multi.fun
+                    result_multi = fin.fminsearchbnd(objFunc.bernoulli_param.bernoulli_param,
+                                                     p0,
+                                                     lower_bound,
+                                                     upper_bound,
+                                                     None,  # options
+                                                     e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt,
+                                                     Ib, Yb)
+                    p_opt = result_multi[0]
+                    temp = result_multi[1]
+                    MaxB = -temp
                     print('Bernoulli')
+                    print([p_opt, MaxB])
                     # put the estimates back to model
                     Ek[e_fill_ind] = p_opt[:len(e_fill_ind)] if len(p_opt[:len(e_fill_ind)]) > 0 else None
                     Fk[0][f_fill_ind] = p_opt[len(e_fill_ind):] if len(p_opt[len(e_fill_ind):]) > 0 else None

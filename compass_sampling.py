@@ -46,7 +46,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
     % YP reaction time
     % YB binary decision
     """
-    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of
+    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time-dependent and the Dk and Fk is linked to a subset of
     # Input
     Yn = []
     Yb = []
@@ -56,11 +56,11 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         %% Normal Observation Model (  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik+Vk*iid white noise )
         % ------------------
         % Y(k) is the observation, and Ik is the input either indicator or continuous
-        % Ck, Dk, Vk are the model paramateres
+        % Ck, Dk, Vk are the model parameters
         % Tk is model specific function - it is original set to but a one matrix
         % ------------------
         % Ck, NxM matrix - (Y is an observation of the length N, N can be 1, 2, ... - The Tk has the same size of input, 
-        % and it is specfically designed for our task. It can be set to all 1 matrix)
+        % and it is specifically designed for our task. It can be set to all 1 matrix)
         """
         Ck = tParam['Ck']
         # Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)
@@ -72,12 +72,12 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
             S = tParam['S']
 
     if DISTR[1] >= 1:
-        MEk, MFk = Cqk.compass_Qk(tIn, tParam)
+        MEk, MFk = Cqk.compass_Qk(Ib, tParam)
         """
         %% Binary Observation Model (  P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )
         % ------------------
         % P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
-        % Ek, and Fk are the model paramaters
+        % Ek, and Fk are the model parameters
         % Qk is model specific function - it is original set to but a one matrix
         % ------------------
         % Ck, NxM matrix - similar to Ck, Tk
@@ -90,7 +90,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
     %% State Space Model (  X(k+1)=Ak*X(k)+Bk*Uk+Wk*iid white noise )
     % ------------------
     % X(k) is the state, and Uk is the input
-    % Ak, Bk, Wk are model paramateres
+    % Ak, Bk, Wk are model parameters
     % ------------------
     % Ak, MxM matrix  (M is the length of the X)
     """
@@ -115,10 +115,10 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         Sk = CTk @ SPre @ CTk.T + Vk
         Yp = CTk @ XPre + DTk @ tIn.T
         # Generate a sample - we assume it is scalar
-        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk)), 0.01)
+        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk))+0.01, 0.01)
         Pa = norm.pdf(ys, loc=Yp, scale=np.sqrt(Sk))
         CPa = np.cumsum(Pa)
-        CPa = CPa / np.sum(CPa)
+        CPa = CPa / np.sum(Pa)
         Yn = ys[np.argmin(np.abs(np.random.rand(1) - CPa))]
     """main observation is Gamma"""
     if DISTR[0] == 2:
@@ -131,8 +131,9 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         ys = ys - S
         Pa = gamma.pdf(ys, a=EYn @ Vk, scale=np.linalg.inv(Vk))
         CPa = np.cumsum(Pa)
-        CPa = CPa / np.sum(CPa)
-        Yn = S + ys[np.argmin(np.abs(np.random.rand(1) - CPa))]
+        CPa = CPa / np.sum(Pa)
+        ui = np.argmin(np.abs(np.random.rand(1) - CPa))
+        Yn = S + ys[ui]
 
     if DISTR[1] == 1:
         ETk = (Ek * MEk[0]) * xM
@@ -143,39 +144,41 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         Yb = 0
         if np.random.rand(1) < pk:
             Yb = 1
-    # return variables
-    if DISTR[0] == 2 and DISTR[1] == 1:
-        return Yb, Yn
-    elif DISTR[0] == 2:
-        return Yn, np.array([])
-    elif DISTR[1] == 1:
-        return np.array([]), Yb
+
+    return Yn,Yb
+    # # return variables
+    # if DISTR[0] == 2 and DISTR[1] == 1:
+    #     return Yb, Yn
+    # elif DISTR[0] == 2:
+    #     return Yn, np.array([])
+    # elif DISTR[1] == 1:
+    #     return np.array([]), Yb
 
 
-Param = {'nd': 1,
-         'nIb': 1,
-         'xM': np.array([[1, 0], [0, 1]]),
-         'dLinkMap': np.array([[0, 1], [1, 1]]),
-         'dConstantUpdate': np.array([[0, 1, 1]]),
-         'Ak': np.array([[0.9999, 0], [0, 0.9999]]),
-         'Bk': np.array([[0, 0], [0, 0]]),
-         'Wk': np.array([[0.1107, 0], [0, 0.0607]]),
-         'Ck': np.array([[1, 1]]),
-         'Dk': np.array([[0, 0, 4.7672]]),
-         'Uk': np.array([[0, 0]]),
-         'nc': 1,
-         'nIn': 3,
-         'cLinkMap': np.array([[0, 1], [1, 1]]),
-         'cConstantUpdate': np.array([[0, 3, 1]]),
-         'Vk': 4.951167805469680,
-         'S': 0.10,
-         'Ek': np.array([[1, 1]]),
-         'Fk': np.array([[0, 0, 0]])
-         }
-DISTR = [1, 1]
-
-print(compass_sampling(DISTR=[2, 0], tIn=np.array([[1, 0, 1]]), Ib=np.array([[1, 0, 1]]), tParam=Param,
-                       XPos0=np.array([[-4.76676019471412], [0]]),
-                       SPos0=np.array([[0.120655723947377, -0.00399920004000000],
-                                       [-0.00399920004000000,
-                                        0.0706739399093090]]), Cut_Time=1))
+# Param = {'nd': 1,
+#          'nIb': 1,
+#          'xM': np.array([[1, 0], [0, 1]]),
+#          'dLinkMap': np.array([[0, 1], [1, 1]]),
+#          'dConstantUpdate': np.array([[0, 1, 1]]),
+#          'Ak': np.array([[0.9999, 0], [0, 0.9999]]),
+#          'Bk': np.array([[0, 0], [0, 0]]),
+#          'Wk': np.array([[0.1107, 0], [0, 0.0607]]),
+#          'Ck': np.array([[1, 1]]),
+#          'Dk': np.array([[0, 0, 4.7672]]),
+#          'Uk': np.array([[0, 0]]),
+#          'nc': 1,
+#          'nIn': 3,
+#          'cLinkMap': np.array([[0, 1], [1, 1]]),
+#          'cConstantUpdate': np.array([[0, 3, 1]]),
+#          'Vk': 4.951167805469680,
+#          'S': 0.10,
+#          'Ek': np.array([[1, 1]]),
+#          'Fk': np.array([[0, 0, 0]])
+#          }
+# DISTR = [1, 1]
+#
+# print(compass_sampling(DISTR=[2, 0], tIn=np.array([[1, 0, 1]]), Ib=np.array([[1, 0, 1]]), tParam=Param,
+#                        XPos0=np.array([[-4.76676019471412], [0]]),
+#                        SPos0=np.array([[0.120655723947377, -0.00399920004000000],
+#                                        [-0.00399920004000000,
+#                                         0.0706739399093090]]), Cut_Time=1))

@@ -14,19 +14,24 @@ import compass_Tk as Ctk
 import compass_Qk as Cqk
 import compass_sampling as Csam
 import algorithms_details as ad
+
 """
 Comments for the variables down here
 """
 
-def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_valid=None, XPos0=None, SPos0=None):
+
+def compass_filtering(DISTR=None, Uk=None, In=None, Param=None, Ib=None, Yn=None, Yb=None, obs_valid=None, XPos0=None,
+                      SPos0=None):
+    SP = []
     # variables from the dictionary to reduce the clutter down in the main code
-    update_mode = tParam['UpdateMode']
+    update_mode = np.copy(Param['UpdateMode'])
     # State Space Model(X(k + 1) = Ak * X(k) + Bk * Uk + Wk * iid white noise)
-    Ak = tParam['Ak']
-    Bk = tParam['Bk']
-    Wk = tParam['Wk']
-    xM = tParam['xM']
-    Uk = tParam['Uk']
+    Ak = np.copy(Param['Ak'])
+    Bk = np.copy(Param['Bk'])
+    Wk = np.copy(Param['Wk'])
+    xM = np.copy(Param['xM'])
+    # Uk = np.copy(Param['Uk'])
+
     # Observation mode: 1 to 5
     if DISTR[0] == 1:
         observe_mode = DISTR[0] + 2 * DISTR[1]
@@ -35,52 +40,53 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
     else:
         observe_mode = 2 * DISTR[1]
 
-    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of
+    # Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time-dependent and the Dk and Fk is linked to a subset of
     # Input
-    [MCk, MDk] = Ctk.compass_Tk(tIn, tParam)
+    [MCk, MDk] = Ctk.compass_Tk(In, Param)
     if DISTR[1] == 1:
-        [MEk, MFk] = Cqk.compass_Qk(tIn, tParam)
+        [MEk, MFk] = Cqk.compass_Qk(Ib, Param)
 
     # Censored Reaction Time
     # Remember this is with respect to the documentation where we have the obs_valid value as 2,
     # this makes it to be with respect to the idea of the gamma log distributions
-    if (np.argwhere(obs_valid == 2)).size != 0:
-        censor_time = tParam['censor_time']
-    ''' Normal/Gamms Observation Model'''
+    if 2 in obs_valid:
+        censor_time = np.copy(Param['censor_time'])
+
+    ''' Normal/Gamma Observation Model'''
     if DISTR[0] > 0:
         '''
         % For Normal,  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik + Vk    Vk variance of iid white noise
         % For Gamma,   Y(k)=exp((Ck.*Tk)*X(k)+Dk*Ik)    Vk is dispersion term 
         % ------------------
         % Y(k) is the observation, and Ik is the input either indicator or continuous
-        % Ck, Dk, Vk are the model paramateres
+        % Ck, Dk, Vk are the model parameters
         % Tk is model specific function - it is original set to but a one matrix
         % ------------------
         % Ck, 1xM matrix - (Y is an scalar observation at each time point ... - The Tk has the same size of input, 
-        % and it is specfically designed for our task. It can be set to all 1 matrix)
+        % and it is specifically designed for our task. It can be set to all 1 matrix)
         '''
-        Ck = tParam['Ck']
+        Ck = np.copy(Param['Ck'])
         # Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)
-        Dk = tParam['Dk'] * MDk
-        # Vk, is scaler represnting noise in Normal or Dispresion Term in Gamma
-        Vk = tParam['Vk']
+        Dk = Param['Dk'] * MDk
+        # Vk, is scaler representing noise in Normal or Dispresion Term in Gamma
+        Vk = np.copy(Param["Vk"])
 
     '''Binary Observation Model (P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )'''
     if DISTR[1] == 1:
         '''
         % ------------------
         % P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
-        % Ek, and Fk are the model paramateres
+        % Ek, and Fk are the model parameters
         % Qk is model specific function - it is original set to but a one matrix
         % ------------------
         % Ck, NxM matrix - similar to Ck, Tk
         '''
-        Ek = tParam['Ek']
+        Ek = np.copy(Param['Ek'])
         # Fk, NxS5 matrix - Similar to Dk
-        Fk = tParam['Fk'] * MFk
+        Fk = Param['Fk'] * MFk
 
     '''Check Uk'''
-    if not Uk:
+    if np.any(Uk):
         Uk = np.zeros((1, Bk.shape[1]))
 
     ''' 
@@ -93,19 +99,20 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
     if obs_valid >= 1:
         '''Draw a sample if it is censored'''
         if obs_valid == 2:
-            [tYP, tYB] = Csam.compass_sampling(DISTR=DISTR, Cut_Time=censor_time, tIn=tIn, tParam=tParam, Ib=Ib,
-                                             XPos0=XPre, SPos0=SPre)
+            [tYP, tYB] = Csam.compass_sampling(DISTR=DISTR, Cut_Time=censor_time, tUk = Uk, tIn=In, tParam=Param, Ib=Ib,
+                                               XPos0=XPre, SPos0=SPre)
             if DISTR[0] > 0:
                 Yn = tYP
             elif DISTR[1] == 1:
                 Yb = tYB
+
         # Observation: Normal
         if observe_mode == 1:
             CTk = (Ck * MCk[0]) @ xM
             DTk = Dk
             # XPos
             Sk = CTk @ SPre @ CTk.T + Vk
-            Yp = CTk @ XPre + DTk @ tIn.T
+            Yp = CTk @ XPre + DTk @ In.T
             XPos = XPre + (SPre @ CTk.T @ np.linalg.inv(Sk) @ (Yn - Yp))
             # SPos
             SPos = np.linalg.inv(np.linalg.inv(SPre) + CTk.T @ np.linalg.inv(Vk) @ CTk)
@@ -125,7 +132,7 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
                     xpos = XPre + SPre @ ETk.T @ (Yb - pk)
                 XPos = xpos
                 # SPos
-                SPos = np.linalg(np.linalg.inv(SPre) + ETk.T @ np.diag(pk * (1 - pk)) @ ETk)
+                SPos = np.linalg.inv(np.linalg.inv(SPre) + ETk.T @ np.diag(pk * (1 - pk)) @ ETk)
             #  one-step mode
             if update_mode == 2:
                 st = ETk @ XPre + FTk @ Ib.T
@@ -134,7 +141,7 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
                 XPos = XPre + SPos @ ETk.T @ (Yb - pk)
 
         ''' Observation: Normal+Bernoulli'''
-        if update_mode == 3:
+        if observe_mode == 3:
             CTk = (Ck * MCk[0]) @ xM
             DTk = Dk
             ETk = (Ek * MEk[0]) @ xM
@@ -145,7 +152,7 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
                 # recursive mode
                 in_loop = 10
                 xpos = XPre
-                Yp = CTk @ XPre + DTk @ tIn.T
+                Yp = CTk @ XPre + DTk @ In.T
                 Sk = CTk.T @ np.linalg.inv(Vk) @ CTk + np.linalg.inv(SPre)
                 for t in range(in_loop):
                     st = ETk @ xpos + FTk @ Ib.T
@@ -157,7 +164,7 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
                     np.linalg.inv(SPre) + CTk.T @ np.linalg.inv(Vk) @ CTk + ETk.T @ np.diag(pk * (1 - pk)) @ ETk)
             # one-step mode
             if update_mode == 2:
-                Yp = CTk @ XPre + DTk @ tIn.T
+                Yp = CTk @ XPre + DTk @ In.T
                 st = ETk @ XPre + FTk @ Ib.T
                 pk = np.exp(st) / (1 + np.exp(st))
                 SPos = np.linalg.inv(
@@ -172,17 +179,17 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
             # recursive mode
             if update_mode == 1:
                 # recursive mode
-                Yk = Yn - tParam['S']
+                Yk = Yn - Param['S']
                 in_loop = 10
                 xpos = XPre
                 for t in range(in_loop):
-                    Yp = np.exp(CTk @ xpos + DTk @ tIn.T)
-                    xpos = XPre - SPre @ Vk @ CTk.T @ (1 - Yk @ np.linalg.inv(Yp))
+                    Yp = np.exp(CTk @ xpos + DTk @ In.T)
+                    xpos = XPre - SPre @ Vk @ CTk.T @ (1 - Yk * np.linalg.inv(Yp))
                 XPos = xpos
-                SPos = np.linalg.inv((np.linalg.inv(SPre) + (Vk @ (Yk @ np.linalg.inv(Yp))) * CTk.T @ CTk))
+                SPos = np.linalg.inv((np.linalg.inv(SPre) + (Vk @ (Yk  * np.linalg.inv(Yp))) * CTk.T @ CTk))
             if update_mode == 2:
-                Yk = Yn - tParam['S']
-                Yp = np.exp(CTk @ XPre + DTk @ tIn.T)
+                Yk = Yn - Param['S']
+                Yp = np.exp(CTk @ XPre + DTk @ In.T)
                 SPos = np.linalg.inv(np.linalg.inv(SPre) + Vk @ (Yk @ np.linalg.inv(Yp)) @ Ctk.T @ CTk)
                 XPos = XPre - SPos @ Vk @ CTk.T @ (1 - (Yk @ np.linalg.inv(Yp)))
 
@@ -196,30 +203,32 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
             if update_mode == 1:
                 # XPos, SPos
                 in_loop = 10
-                Yk = Yn - tParam['S']
+                Yk = Yn - Param['S']
                 xpos = XPre
                 for t in range(in_loop):
                     st = ETk @ xpos + FTk @ Ib.T
-                    pk = np.exp(st) / (1 + np.exp(st));
-                    Yp = np.exp(CTk @ xpos + DTk @ tIn.T)
-                    xpos = XPre + SPre @ (ETk.T @ (Yb - pk) - Vk @ CTk.T @ (1 - Yk @ np.linalg.inv(Yp)))
+                    pk = np.exp(st) / (1 + np.exp(st))
+                    Yp = np.exp(CTk @ xpos + DTk @ In.T)
+                    xpos = XPre + SPre @ (ETk.T @ (Yb - pk) - Vk @ CTk.T @ (1 - Yk * np.linalg.inv(Yp)))
                 XPos = xpos
                 SPos = np.linalg.inv(
-                    np.linalg.inv(SPre) + CTk.T @ CTk @ Vk @ (Yk @ np.linalg.inv(Yp)) + ETk.T @ ETk @ np.diag(pk * (1 - pk)))
+                    np.linalg.inv(SPre) + CTk.T @ CTk @ Vk @ (Yk * np.linalg.inv(Yp)) + ETk.T @ ETk @ np.diag(
+                        pk * (1 - pk)))
             if update_mode == 2:
                 # XPos, SPos
-                Yk = Yn - tParam['S']
-                Yp = np.exp(CTk @ XPre + DTk @ tIn.T)
+                Yk = Yn - Param['S']
+                Yp = np.exp(CTk @ XPre + DTk @ In.T)
                 # Pk
                 st = ETk @ XPre + FTk @ Ib.T
                 pk = np.exp(st) / (1 + np.exp(st))
                 # SPos
                 SPos = np.linalg.inv(
-                    np.linalg.inv(SPre) + CTk.T @ CTk @ Vk @ (Yk @ np.linalg.inv(Yp)) + ETk.T @ ETk @ np.diag(pk * (1 - pk)))
+                    np.linalg.inv(SPre) + CTk.T @ CTk @ Vk @ (Yk @ np.linalg.inv(Yp)) + ETk.T @ ETk @ np.diag(
+                        pk * (1 - pk)))
                 # XPos
                 XPos = XPre + SPre @ (ETk.T @ (Yb - pk) - Vk @ CTk.T @ (1 - Yk @ np.linalg.inv(Yp)))
     else:
-        # randomly censored, the filter estimate will be equal to one step prediction
+        # randomly censored, the filter estimate will be equal to one-step prediction
         XPos = XPre
         SPos = SPre
 
@@ -234,14 +243,14 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
         DTk = Dk
         # EYn
         if DISTR[0] == 1:
-            temp = CTk @ XPos + DTk @ tIn.T
+            temp = CTk @ XPos + DTk @ In.T
             YP = temp.T
         else:
-            temp = CTk @ XPos + DTk @ tIn.T
-            YP = np.exp(temp) @ np.exp(0.5 @ CTk @ SPos @ CTk.T)
-            SP = np.exp(2 * temp) @ np.exp(2 @ CTk @ SPos @ CTk.T) - YP @ YP
+            temp = CTk @ XPos + DTk @ In.T
+            YP = np.exp(0.5 * CTk @ temp @ CTk.T) # np.exp(temp) @ np.exp(0.5 @ CTk @ SPos @ CTk.T)
+            # SP = np.exp(2 * temp) @ np.exp(2 @ CTk @ SPos @ CTk.T) - YP @ YP
             # YP = np.exp(0.5 @ CTk @ SPos @ CTk.T)
-            YP = tParam['S'] + YP
+            YP = Param['S'] + YP
 
     if DISTR[1] == 1:
         # Filtering
@@ -249,47 +258,6 @@ def compass_filtering(DISTR=None, tIn=None, tParam=None, Ib=None, Yn=None, obs_v
         FTk = Fk
         # YP
         temp = ETk @ XPos + FTk @ Ib.T
-        YB = np.exp(temp.T)/(1+np.exp(temp.T))
+        YB = np.exp(temp.T) / (1 + np.exp(temp.T))
 
-    return XPos, SPos, YP, SP, YB
-
-Param = {'nd': 1,
-         'nIb': 1,
-         'UpdateMode': 2,
-         'censor_time': 0.9,
-         'xM': np.array([[1, 0], [0, 1]]),
-         'dLinkMap': np.array([[0, 1], [1, 1]]),
-         'dConstantUpdate': np.array([[0, 1, 1]]),
-         'Ak': np.array([[0.9999, 0], [0, 0.9999]]),
-         'Bk': np.array([[0, 0], [0, 0]]),
-         'Wk': np.array([[0.1107, 0], [0, 0.0607]]),
-         'Ck': np.array([[1, 1]]),
-         'Dk': np.array([[0, 0, 4.7672]]),
-         'Uk': np.array([[0, 0]]),
-         'nc': 1,
-         'nIn': 3,
-         'cLinkMap': np.array([[0, 1], [1, 1]]),
-         'cConstantUpdate': np.array([[0, 3, 1]]),
-         'Vk': np.array([[0.45]]),
-         'S': 0.10,
-         'Ek': np.array([[1, 1]]),
-         'Fk': np.array([[0, 0, 0]])
-         }
-
-XPos,SPos,YP,SP,YB = compass_filtering(DISTR=[1, 0], tIn=np.array([[1, 0, 1]]), Ib=np.array([[1, 0, 1]]), Yn=0.658, tParam=Param,
-                  obs_valid=1,
-                  XPos0=np.array([[-4.76676019471412], [0]]), SPos0=np.array([[0.120655723947377, -0.00399920004000000],
-                                                                              [-0.00399920004000000,
-                                                                               0.0706739399093090]]))
-
-
-print(ad.algorithms_details(exp_distribution_type = 'UCB',algo_details={'epsilon':0.9},patient_details={'numberArms':10},
-                     current_details={'armselectedCount':[3,5,6,7,10,14,4,3,2,4],'meanRTvalue': [0.3,0.5,0.6,0.75,0.81,0.68,0.15,0.35,0.56,0.3],'trialNumber':60}) )
-
-
-
-print(XPos)
-# remove the extra argument and add the sensor model which will be used to retrieve
-# may be CLI library
-# all this code will be compiled using nuitka. (helps with the performance since we are using the binary )
-# Let's keep the code seperate
+    return XPos, SPos, YP, YB
