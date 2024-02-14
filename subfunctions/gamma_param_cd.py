@@ -5,10 +5,11 @@ by Sumedh Nagrale
 """
 
 import numpy as np
-from scipy.special import gamma, gammainc
+from scipy.special import gamma, gammaincc
+from scipy.stats import gamma as gammapdf
 
 
-def GammaParamCD(p, Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In):
+def gamma_param_cd(p, Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, xM, XSmt, SSmt, In):
     # first parameter is v
     # second parameter is alpha (alpha is positive and smaller than minimum Yn)
     # yk - paper EMBC
@@ -19,9 +20,9 @@ def GammaParamCD(p, Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, x
     ck[c_fill_ind] = p[0:len(c_fill_ind)]
     # dtk - parameters linked to Input
     # adding 1 to the index
-    dk[d_fill_ind] = p[1+len(c_fill_ind):]
+    dk[d_fill_ind] = p[0+len(c_fill_ind):] # p[1+len(c_fill_ind):] # sumedh
     # function value
-    f = 0
+    f = np.zeros((1, 1))
     # now, calculate a part
     val_ind = np.where(obs_valid)[0]
     for l in range(len(val_ind)):
@@ -35,16 +36,18 @@ def GammaParamCD(p, Yn, S, Vk, ck, c_fill_ind, dk, d_fill_ind, obs_valid, MCk, x
         sy = ctk @ SSmt[t] @ ctk.T
         # common term
         if obs_valid[t] == 1:
-            f += np.log(gamma(v)) - v * np.log(yk[t] * v) + v * ey + np.log(yk[t]) + v * yk[t] * np.exp(
-                -ey + 0.5 * sy)
+            f = f + np.log(gamma(v)) - v * np.log(yk[t] * v) + v * ey + np.log(yk[t]) + v * yk[t] * np.exp(
+                -ey + 0.5 * sy) # sumedh (this v will break its an array)
         if obs_valid[t] == 2:
             # point at mean
             h0 = v * yk[t] * np.exp(-ey)
             # incomplete gamma at h0
-            g0 = gammainc(h0, v, 'upper')
-            g1 = gamma.pdf(h0, v, 0, 1)
+            g0 = gammaincc(v, h0)
+            # g0 = gammainc(h0, v, 'upper')
+            # g1 = gamma.pdf(h0, v, 0, 1)
+            g1 = gammapdf.pdf(h0, v, scale=1)
             # derivative of log of incomplete
             g2 = g1 / g0
             gt = (v - h0) * h0 * g2 + h0 * h0 * g2 * g2
-            f -= np.log(g0) + 0.5 * (ctk @ SSmt[t] @ ctk.T) * gt
-    return f
+            f = f - np.log(g0) + 0.5 * (ctk @ SSmt[t] @ ctk.T) * gt # sumedh
+    return f[0] # sumedh

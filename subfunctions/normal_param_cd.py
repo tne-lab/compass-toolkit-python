@@ -9,15 +9,18 @@ from scipy.stats import norm
 
 
 # Normal parameters - C,D
-def NormalParamCD(p, Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
+def normal_param_cd(p, Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
     # replace params
 
     sv = Vk
-    ck[c_fill_ind] = p[0:len(c_fill_ind)]
-    dk[d_fill_ind] = p[1+len(c_fill_ind):]
+    # ck[c_fill_ind] = p[0:len(c_fill_ind)]
+    # dk[d_fill_ind] = p[1+len(c_fill_ind):]
 
+    # The logic is to start from the second point so that we have the location from 1 and so on
+    ck[c_fill_ind] = p[0:1 + len(c_fill_ind)]  # removing 1 from the script
+    dk[d_fill_ind] = p[0 + len(c_fill_ind):]  # the next element after the ck portion
     # function value
-    f = 0
+    f = np.zeros((1, 1))
 
     # now, calculate a part
     val_ind = np.where(obs_valid)[0]
@@ -33,7 +36,7 @@ def NormalParamCD(p, Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn,
         sy = ctk @ SSmt[z] @ ctk.T
 
         if obs_valid[z] == 1:
-            f += 0.5 * np.log(sv) + (dy ** 2 + sy) / (2 * sv)
+            f = f + 0.5 * np.log(sv) + (dy ** 2 + sy) / (2 * sv)
 
         if obs_valid[z] == 2:
             h0 = dy / np.sqrt(sv)
@@ -43,6 +46,6 @@ def NormalParamCD(p, Vk, c_fill_ind, d_fill_ind, ck, dk, obs_valid, MCk, xM, Yn,
             # derivative of log of incomplete
             g1 = norm.pdf(h0, loc=0, scale=1) / g0
             gt = (1 / np.sqrt(sv)) * h0 * g1 - g1 ** 2
-            f -= np.log(g0) - 0.5 * sy * gt
+            f = f - np.log(g0) - 0.5 * sy * gt
 
-    return f
+    return f[0]

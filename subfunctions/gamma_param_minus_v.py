@@ -5,7 +5,7 @@ by Sumedh Nagrale
 """
 
 import numpy as np
-from scipy.special import gamma, gammainc
+from scipy.special import gamma, gammaincc
 
 
 # Gamma Paramater Estimation
@@ -21,7 +21,7 @@ def gamma_param_minus_v(p, Yn, Vk, ck, dk, MCk, xM, In, XSmt, SSmt, c_fill_ind, 
     # dtk - parameters linked to Input
     dk[d_fill_ind] = p[1 + len(c_fill_ind):]
     # function value
-    f = 0
+    f = np.zeros((1, 1))
     # now, calculate a part
     val_ind = np.where(obs_valid)[0]
     for l in range(len(val_ind)):
@@ -35,16 +35,16 @@ def gamma_param_minus_v(p, Yn, Vk, ck, dk, MCk, xM, In, XSmt, SSmt, c_fill_ind, 
         sy = ctk @ SSmt[t] @ ctk.T
         # common term
         if obs_valid[t] == 1:
-            f += np.log(gamma(v)) - v * np.log(yk[t] * v) + v * ey + np.log(yk[t]) + v * yk[t] * np.exp(
+            f = f + np.log(gamma(v)) - v * np.log(yk[t] * v) + v * ey + np.log(yk[t]) + v * yk[t] * np.exp(
                 -ey + 0.5 * sy)
         if obs_valid[t] == 2:
             # point at mean
             h0 = v * yk[t] / np.exp(-ey)
             # incomplete gamma at h0
-            g0 = gamma(v) * gammainc(h0, v, upper=True)
+            g0 = gamma(v) * gammaincc(v, h0)
             # derivative of log of incomplete
             g1 = -((h0 ** (v - 1)) * np.exp(-h0)) / g0
             g2 = g1 * (((v - 1) / h0) - 1) - g1 ** 2
             gt = g2 * h0 * h0 + g1 * h0
-            f += np.log(gamma(v)) - np.log(g0) - 0.5 * (ctk @ SSmt[t] @ ctk.T) * gt
-    return f
+            f = f + np.log(gamma(v)) - np.log(g0) - 0.5 * (ctk @ SSmt[t] @ ctk.T) * gt
+    return f[0]

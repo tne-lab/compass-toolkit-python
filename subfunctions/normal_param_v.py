@@ -9,13 +9,13 @@ from scipy.stats import norm
 
 
 # Normal parameters - C,D
-def NormalParamV(p, Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
+def normal_param_v(p, Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
     # replace params
     ck = Ck
     dk = Dk
     sv = p[0]
     # function value
-    f = 0
+    f = np.zeros((1, 1))
     # now, calculate a part
     val_ind = np.where(obs_valid)[0]
     for l in range(len(val_ind)):
@@ -24,11 +24,11 @@ def NormalParamV(p, Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
         # param on time
         ctk = (ck * MCk[z]) @ xM
         dtk = dk
-        
+
         dy = Yn[z] - ctk @ XSmt[z] - dtk @ In[z].T
         sy = ctk @ SSmt[z] @ ctk.T
         if obs_valid[z] == 1:
-            f += 0.5 * np.log(sv) + (dy ** 2 + sy) / (2 * sv)
+            f = f + 0.5 * np.log(sv) + (dy ** 2 + sy) / (2 * sv)
 
         if obs_valid[z] == 2:
             h0 = dy / np.sqrt(sv)
@@ -38,5 +38,5 @@ def NormalParamV(p, Ck, Dk, obs_valid, MCk, xM, Yn, XSmt, In, SSmt):
             # derivative of log of incomplete
             g1 = norm.pdf(h0, loc=0, scale=1) / g0
             gt = (1 / np.sqrt(sv)) * h0 * g1 - g1 ** 2
-            f -= np.log(g0) - 0.5 * sy * gt
-    return f
+            f = f - np.log(g0) - 0.5 * sy * gt
+    return f[0]
