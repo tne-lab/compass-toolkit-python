@@ -14,4 +14,3 @@ def compass_plot_bound(mode, x, y, y_low, y_high, x_title='', y_title='', fig_ti
     h = plt.plot(x, y, 'k', linewidth=3)
 
     return h
-

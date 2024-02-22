@@ -3,11 +3,11 @@ Translation of MATLAB code 'compass_deviance.m' to python
 16 Sep 2023  Translated by Sumedh Nagrale
 """
 import numpy as np
-import compass_Tk as Ctk
-import compass_Qk as Cqk
 import scipy.stats as stats
-import compass_post_sampling as cps
 
+import compass_toolkit.compass_Tk as Ctk
+import compass_toolkit.compass_Qk as Cqk
+import compass_toolkit.compass_post_sampling as cps
 
 def compass_deviance(DISTR=None, In=None, Ib=None, Yn=None, Yb=None, Param=None, obs_valid=None, XSmt=None, SSmt=None):
     # This function calculates the deviance for both continuous and discrete observations

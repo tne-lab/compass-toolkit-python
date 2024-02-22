@@ -1,12 +1,15 @@
 import numpy as np
-from scipy.stats import mvn
+
 from scipy.special import polygamma
 
-import compass_post_sampling as cps
-import compass_Tk as Ctk
-import compass_Qk as Cqk
+import compass_toolkit.compass_post_sampling as cps
+import compass_toolkit.compass_Tk as Ctk
+import compass_toolkit.compass_Qk as Cqk
 
 
+# line 21-24 and line 28-31
+# line 34 is slow,
+# Change all the dictionary calls to variables use
 def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, XSmt, SSmt):
     K = max(len(Yn), len(Yb))
 
@@ -52,7 +55,7 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
             tempB = None
             tempAB = None
 
-        temp = Param['Wk'][r,r] * np.linalg.pinv(np.block([[tempA, tempAB], [tempAB.T, tempB]]))
+        temp = Param['Wk'][r, r] * np.linalg.pinv(np.block([[tempA, tempAB], [tempAB.T, tempB]]))
 
         COV_X_r = {}
         COV_X_r['A'] = temp[:Param['Ak'].shape[0], :Param['Ak'].shape[0]]
@@ -135,7 +138,7 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
             tempDV = tempDV - MDk * (1 - Y * np.sum(Mx) / N)  # np.dot(MDk, 1 - Y * np.sum(Mx) / N)
             tempDS -= Vk * np.dot(MDk, np.sum(Mx)) / N
             tempSS += (1 - Vk) / Y ** 2
-            tempVV = tempVV-polygamma(1, Vk) + 1 / Vk
+            tempVV = tempVV - polygamma(1, Vk) + 1 / Vk
             tempSV += (-1 / Y) + np.sum(Mx) / N
 
         temp = np.block([[tempCC, tempCD],
@@ -151,7 +154,8 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
 
         if S != 0:
             ind = np.concatenate((np.arange(tempCC.shape[0]), np.arange(tempCC.shape[0]) + len(MDk),
-                                  np.arange(tempCC.shape[0]) + len(MDk.T) + 1, np.arange(tempCC.shape[0]) + len(MDk.T) + 2))
+                                  np.arange(tempCC.shape[0]) + len(MDk.T) + 1,
+                                  np.arange(tempCC.shape[0]) + len(MDk.T) + 2))
             temp = temp[:, ind]
             temp = temp[ind, :]
             temp_x = -np.linalg.pinv(temp)
@@ -177,8 +181,10 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
         COV_C['CD'] = temp[:len(Param['Ck']), len(Param['Ck']):len(Param['Ck']) + len(Param['Dk'].T)]
         COV_C['CV'] = temp[:len(Param['Ck']), len(Param['Ck']) + len(Param['Dk'].T)]
         COV_C['CS'] = temp[:len(Param['Ck']), len(Param['Ck']) + len(Param['Dk'].T) + 1]
-        COV_C['DV'] = temp[len(Param['Ck']):len(Param['Ck']) + len(Param['Dk'].T),len(Param['Ck']) + len(Param['Dk'].T)]
-        COV_C['DS'] = temp[len(Param['Ck']):len(Param['Ck']) + len(Param['Dk'].T),len(Param['Ck']) + len(Param['Dk'].T) + 1]
+        COV_C['DV'] = temp[len(Param['Ck']):len(Param['Ck']) + len(Param['Dk'].T),
+                      len(Param['Ck']) + len(Param['Dk'].T)]
+        COV_C['DS'] = temp[len(Param['Ck']):len(Param['Ck']) + len(Param['Dk'].T),
+                      len(Param['Ck']) + len(Param['Dk'].T) + 1]
         COV_C['VS'] = temp[-1, -2]
 
     if DISTR[1] == 1:
@@ -197,7 +203,7 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
 
         for k in range(1, K):
             Xs = np.dot(xM, np.random.multivariate_normal(XSmt[k][0], SSmt[k], N).T)
-            temp =(Ek * MEk[k]) @ Xs + (Fk * MFk) @ Ib[k]
+            temp = (Ek * MEk[k]) @ Xs + (Fk * MFk) @ Ib[k]
             Ps = np.exp(temp) / (1 + np.exp(temp))
             Xs_a = np.tile(Ps * (1 - Ps), (len(Ek), 1)) * Xs
             Xs_b = Xs
@@ -207,7 +213,7 @@ def compass_param_covariance_info(DISTR, Uk, In, Ib, Yn, Yb, Param, obs_valid, X
 
         temp = np.block([[tempA, tempAB],
                          [tempAB.T, tempB]])
-        ind =np.concatenate((np.arange(tempA.shape[0]), np.arange(tempA.shape[0]) + 1 + np.where(MFk != 0)[0]))
+        ind = np.concatenate((np.arange(tempA.shape[0]), np.arange(tempA.shape[0]) + 1 + np.where(MFk != 0)[0]))
         temp = temp[:, ind]
         temp = temp[ind, :]
         temp_x = np.linalg.pinv(temp)

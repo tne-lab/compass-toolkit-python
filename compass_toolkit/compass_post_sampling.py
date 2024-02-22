@@ -4,48 +4,51 @@ Translation of MATLAB code 'compass_post_sampling.m' to python
 Following modifications were made to
 1. Removing bugs
 """
-import compass_Tk as Ctk
 import numpy as np
-import compass_Qk as Cqk
 from scipy.stats import norm
 from scipy.stats import gamma
 
+import compass_toolkit.compass_Tk as Ctk
+import compass_toolkit.compass_Qk as Cqk
+
 
 def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=None, XSmt=None, SSmt=None):
-    ''' Input Argument
-    % DISTR, a vecotr of two variables. The [1 0] means there is only normal
-    % observation/s, [0 1] means there is only binary observation/s, and [1 1]
-    % will be both observations.
-    % Uk: is a matrix of size KxS1 - K is the length of observation - input to
-    % State model - X(k)=A*X(k-1)+B*Uk+Wk
-    % In: is a matrix of size KxS3 - K is the length of observation - input to Normal observation model
-    % Yn(k)=(C.*MCk)*X(k)+(D.*MDk)*In+Vk       - C and D are free parameters,
-    % and MCk and MDk are input dependent components
-    % Ib: is a matrix of size KxS5 - K is the length of observation - input to Binary observation model
-    %  P(Yb(k)==1)=sigmoid((E.*MEk)*X(k)+(F.*MFk)*Ib       - E and F are free parameters,
-    % and MEk and MFk are input dependent components
-    % Yn: is a matrix of size KxN  - K is the length of observation, matrix of
-    % normal observation
-    % Yb: is a matrix of size KxN  - K is the length of observation, matrix of
-    % binary observation
-    % Param: it keeps the model information, and paramaters '''
+    """Input Argument
+    DISTR, a vector of two variables. The [1 0] means there is only normal
+    observation/s, [0 1] means there is only binary observation/s, and [1 1]
+    will be both observations.
+    Uk: is a matrix of size KxS1 - K is the length of observation - input to
+    State model - X(k)=A*X(k-1)+B*Uk+Wk
+    In: is a matrix of size KxS3 - K is the length of observation - input to Normal observation model
+    Yn(k)=(C.*MCk)*X(k)+(D.*MDk)*In+Vk       - C and D are free parameters,
+    and MCk and MDk are input dependent components
+    Ib: is a matrix of size KxS5 - K is the length of observation - input to Binary observation model
+     P(Yb(k)==1)=sigmoid((E.*MEk)*X(k)+(F.*MFk)*Ib       - E and F are free parameters,
+    and MEk and MFk are input dependent components
+    Yn: is a matrix of size KxN  - K is the length of observation, matrix of
+    normal observation
+    Yb: is a matrix of size KxN  - K is the length of observation, matrix of
+    binary observation
+    Param: it keeps the model information, and parameters
+    """
+
     ''' Output Argument
-    % YP reaction time
-    % YB binary decision'''
+    YP reaction time
+    YB binary decision'''
     '''Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of 
     Input '''
     Yn = []
     Yb = []
     if DISTR[0] >= 1:
         [MCk, MDk] = Ctk.compass_Tk(In, Param)
-        '''%% Normal Observation Model (  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik+Vk*iid white noise )
-        % ------------------
-        % Y(k) is the observation, and Ik is the input either indicator or continuous
-        % Ck, Dk, Vk are the model paramateres
-        % Tk is model specific function - it is original set to but a one matrix
-        % ------------------
-        % Ck, NxM matrix - (Y is an observation of the length N, N can be 1, 2, ... - The Tk has the same size of input, 
-        % and it is specfically designed for our task. It can be set to all 1 matrix)'''
+        '''%Normal Observation Model (  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik+Vk*iid white noise )
+        ------------------
+        Y(k) is the observation, and Ik is the input either indicator or continuous
+        Ck, Dk, Vk are the model parameters
+        Tk is model specific function - it is original set to but a one matrix
+        ------------------
+        Ck, NxM matrix - (Y is an observation of the length N, N can be 1, 2, ... - The Tk has the same size of input, 
+        and it is specfically designed for our task. It can be set to all 1 matrix)'''
         Ck = np.copy(Param['Ck'])
         '''Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)'''
         Dk = Param['Dk'] * MDk
@@ -57,13 +60,15 @@ def compass_post_sampling(DISTR=None, Cut_Time=None, In=None, Ib=None, Param=Non
 
     if DISTR[1] >= 1:
         [MEk, MFk] = Cqk.compass_Qk(Ib, Param)
-        '''%% Binary Observation Model (  P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )
-        % ------------------
-        % P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
-        % Ek, and Fk are the model paramateres
-        % Qk is model specific function - it is original set to but a one matrix
-        % ------------------
-        % Ck, NxM matrix - similar to Ck, Tk'''
+        '''
+        Binary Observation Model (  P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )
+        ------------------
+        P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
+        Ek, and Fk are the model parameters
+        Qk is model specific function - it is original set to but a one matrix
+        ------------------
+        Ck, NxM matrix - similar to Ck, Tk
+        '''
         Ek = np.copy(Param['Ek'])
         '''Fk, NxS5 matrix - Similar to Dk'''
         Fk = Param['Fk'] * MFk

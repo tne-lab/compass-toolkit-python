@@ -45,7 +45,8 @@ def compass_set_learning_param(Param=None, Iter=None, UpdateStateParam=None,
         Additionally, this includes information about what variable needs to be updated during EM algorithm estimations.
 
         Example: I
-        Param = ccss.compass_create_state_space(2, 1, 3, 3, np.eye(2, 2), np.array([1, 2]), np.array([0, 0]), np.array([1, 2]), np.array([0, 0]))
+        Param = compass_create_state_space(2, 1, 3, 3, np.eye(2, 2), np.array([1, 2]), np.array([0, 0]),
+                                                np.array([1, 2]), np.array([0, 0]))
         Iter = 100
         UpdateStateParam = 0
         UpdateStateNoise = 1
@@ -56,7 +57,7 @@ def compass_set_learning_param(Param=None, Iter=None, UpdateStateParam=None,
         DiagonalA = 1
         UpdateMode = 1
         UpdateCModelShift = 0
-        Param = cslp.compass_set_learning_param(Param, Iter, UpdateStateParam,
+        Param = compass_set_learning_param(Param, Iter, UpdateStateParam,
                                        UpdateStateNoise, UpdateStateX0,
                                        UpdateCModelParam, UpdateCModelNoise,
                                        UpdateDModelParam, DiagonalA,
@@ -91,4 +92,3 @@ def compass_set_learning_param(Param=None, Iter=None, UpdateStateParam=None,
     Param['UpdateCModelShift'] = UpdateCModelShift
 
     return Param
-

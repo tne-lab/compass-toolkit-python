@@ -16,17 +16,18 @@ Following modifications were made to
 1. Removing bugs
 """
 import numpy as np
-import compass_Tk as Ctk
-import compass_Qk as Cqk
 from scipy.stats import norm
 from scipy.stats import gamma
+
+import compass_toolkit.compass_Tk as Ctk
+import compass_toolkit.compass_Qk as Cqk
 
 
 # DISTR,Cut_Time,Uk,In,Ib,Param,XPos0,SPos0 DISTR, censor_time, tUk, tIn, tIb, Param, XPre[k], SPre[k]
 def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None, Ib=None, XPos0=None, SPos0=None):
     """
     %% Input Argument
-    % DISTR, a vecotr of two variables. The [1 0] means there is only normal
+    % DISTR, a vector of two variables. The [1 0] means there is only normal
     % observation/s, [0 1] means there is only binary observation/s, and [1 1]
     % will be both observations.
     % Uk: is a matrix of size KxS1 - K is the length of observation - input to
@@ -41,7 +42,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
     % normal observation
     % Yb: is a matrix of size KxN  - K is the length of observation, matrix of
     % binary observation
-    % Param: it keeps the model information, and paramaters
+    % Param: it keeps the model information, and parameters
     %% Output Argument
     % YP reaction time
     % YB binary decision
@@ -115,7 +116,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         Sk = CTk @ SPre @ CTk.T + Vk
         Yp = CTk @ XPre + DTk @ tIn.T
         # Generate a sample - we assume it is scalar
-        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk))+0.01, 0.01)
+        ys = np.arange(Cut_Time, np.maximum(Cut_Time + 10, Yp + 10 * np.sqrt(Sk)) + 0.01, 0.01)
         Pa = norm.pdf(ys, loc=Yp, scale=np.sqrt(Sk))
         CPa = np.cumsum(Pa)
         CPa = CPa / np.sum(Pa)
@@ -145,7 +146,7 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
         if np.random.rand(1) < pk:
             Yb = 1
 
-    return Yn,Yb
+    return Yn, Yb
     # # return variables
     # if DISTR[0] == 2 and DISTR[1] == 1:
     #     return Yb, Yn
@@ -153,7 +154,6 @@ def compass_sampling(DISTR=None, Cut_Time=None, tUk=None, tIn=None, tParam=None,
     #     return Yn, np.array([])
     # elif DISTR[1] == 1:
     #     return np.array([]), Yb
-
 
 # Param = {'nd': 1,
 #          'nIb': 1,

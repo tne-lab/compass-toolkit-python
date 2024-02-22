@@ -20,14 +20,15 @@ def compass_set_censor_threshold_proc_mode(Param=None, censor_thr=None, censor_m
        update_mode (int) :`1: update mean then covariance 2: update covariance then mean
 
        Returns:
-       Param: A dictionary with information about all the parameters (keys) for state space formulations, EM algorithm updates.
+       Param: A dictionary with information about all the parameters (keys) for state space formulations, EM algorithm
+       updates.
        Additionally, this includes information about what kind of censoring method needs to be used.
 
        Example: I
         censor_thr = np.log(2)
         censor_mode = 1
         update_mode = 1
-        Param = csctpm.compass_set_censor_threshold_proc_mode(Param, censor_thr, censor_mode, update_mode)
+        Param = compass_set_censor_threshold_proc_mode(Param, censor_thr, censor_mode, update_mode)
 
         MATLAB:
         Param = compass_set_censor_threshold_proc_mode(Param,log(2),1,1);

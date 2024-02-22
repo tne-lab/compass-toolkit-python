@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import fmin
+import timeit
 
 def fminsearchbnd(fun, x0, LB=None, UB=None, options=None, *args):
     # Size checks
@@ -101,9 +102,11 @@ def fminsearchbnd(fun, x0, LB=None, UB=None, options=None, *args):
     if options and 'outputfcn' in options:
         params['OutputFcn'] = options['outputfcn']
         options['outputfcn'] = outfun_wrapper
-
+    start_time = timeit.default_timer()
     # Now we can call fmin, but with our own intra-objective function.
     results = fmin(intrafun, x0u, args=(params,), disp=options['disp'], full_output=True)
+    elapsed_time = timeit.default_timer() - start_time
+    print("Elapsed time:", elapsed_time, "seconds")
     xu = results[0]
     fval= results[1]
     exitflag= results[2]

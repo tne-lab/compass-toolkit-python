@@ -14,7 +14,7 @@ Following modifications done:
 
 15th Sep 2023
 Following modifications were made to
-1. Removed the loops which were replaced by np.where
+1. Removed the loops which were replaced by np.Where
 2. Optimized the code for speed.
 3. Added variables separately
 

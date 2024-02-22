@@ -1,53 +1,45 @@
+
 import numpy as np
-import compass_Tk as Ctk
-import compass_Qk as Cqk
-import compass_sampling as Csam
-import fminsearchbnd as fin
-from subfunctions import obj_func as objFunc
-from scipy.optimize import minimize
 from scipy.stats import norm, gamma
 from scipy.special import gammaincc
 
-from scipy.io import savemat
-
+import subfunctions as objective_function
+import compass_toolkit as compass
 
 def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=None, obs_valid=None):
     global MFk, K, Ck, Dk, Vk, censor_time, Ek, Fk, MEk, pk, S, ck, dk, Yp
     ####################################Setup part################################################
     ''' Input Argument
-        % DISTR, a vector of two variables. The [1 0] means there is only normal
-        % observation/s, [0 1] means there is only binary observation/s, and [1 1]
-        % will be both observations.
-        % Uk: is a matrix of size KxS1 - K is the length of observation - input to
-        % State model - X(k)=A*X(k-1)+B*Uk+Wk
-        % In: is a matrix of size KxS3 - K is the length of observation - input to Normal observation model
-        % Yn(k)=(C.*MCk)*X(k)+(D.*MDk)*In+Vk       - C and D are free parameters,
-        % and MCk and MDk are input dependent components
-        % Ib: is a matrix of size KxS5 - K is the length of observation - input to Binary observation model
-        %  P(Yb(k)==1)=sigmoid((E.*MEk)*X(k)+(F.*MFk)*Ib       - E and F are free parameters,
-        % and MEk and MFk are input dependent components
-        % Yn: is a matrix of size KxN  - K is the length of observation, matrix of
-        % normal observation
-        % Yb: is a matrix of size KxN  - K is the length of observation, matrix of
-        % binary observation
-        % Param: it keeps the model information, and paramaters
-    %% Output Argument
-        % XSmt is the smoothing result - mean
-        % SSmt is the smoothing result - variance
-        % Param is the updated model parameters
-        % XPos is the filtering result - mean
-        % SPos is the filtering result - variance
-        % ML is the value of E-step maximization
-        % EYn is the prediction of the Yn
-        % EYb is not added yet, but it can be the prediction of binary probability'''
+         DISTR, a vector of two variables. The [1 0] means there is only normal
+         observation/s, [0 1] means there is only binary observation/s, and [1 1]
+         will be both observations.
+         Uk: is a matrix of size KxS1 - K is the length of observation - input to
+         State model - X(k)=A*X(k-1)+B*Uk+Wk
+         In: is a matrix of size KxS3 - K is the length of observation - input to Normal observation model
+         Yn(k)=(C.*MCk)*X(k)+(D.*MDk)*In+Vk       - C and D are free parameters,
+         and MCk and MDk are input dependent components
+         Ib: is a matrix of size KxS5 - K is the length of observation - input to Binary observation model
+          P(Yb(k)==1)=sigmoid((E.*MEk)*X(k)+(F.*MFk)*Ib       - E and F are free parameters,
+         and MEk and MFk are input dependent components
+         Yn: is a matrix of size KxN  - K is the length of observation, matrix of
+         normal observation
+         Yb: is a matrix of size KxN  - K is the length of observation, matrix of
+         binary observation
+         Param: it keeps the model information, and paramaters
+     Output Argument
+         XSmt is the smoothing result - mean
+         SSmt is the smoothing result - variance
+         Param is the updated model parameters
+         XPos is the filtering result - mean
+         SPos is the filtering result - variance
+         ML is the value of E-step maximization
+         EYn is the prediction of the Yn
+         EYb is not added yet, but it can be the prediction of binary probability'''
 
     '''obs_valid has three values (0= MAR, 1=observed, 2= censored)'''
-    EPS = np.finfo(np.float32).tiny  # np.spacing(1)  # np.finfo(np.float32).eps
-    # math.nextafter(0, 1)
+    EPS = np.finfo(np.float32).tiny
     MAX_EXP = 50
-
     update_mode = np.copy(Param['UpdateMode'])
-
     '''Observation Mode, from 1 to 5'''
     if DISTR[0] == 1:
         observe_mode = DISTR[0] + 2 * DISTR[1]
@@ -58,16 +50,16 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
     '''Build Mask Ck, Dk ,EK and Fk - note that Ck, Ek are time dependent and the Dk and Fk is linked to a subset of 
     Input '''
-    [MCk, MDk] = Ctk.compass_Tk(In, Param)
+    [MCk, MDk] = compass.compass_Tk(In, Param)
     if DISTR[1] == 1:
-        [MEk, MFk] = Cqk.compass_Qk(Ib, Param)
+        [MEk, MFk] = compass.compass_Qk(Ib, Param)
 
-    '''%% State Space Model (X(k+1)= Ak*X(k) + Bk*Uk + Wk*iid white noise )
-    % ------------------
-    % X(k) is the state, and Uk is the input
-    % Ak, Bk, Wk are model paramateres
-    % ------------------
-    % Ak, MxM matrix  (M is the length of the X)'''
+    ''' State Space Model (X(k+1)= Ak*X(k) + Bk*Uk + Wk*iid white noise )
+     ------------------
+     X(k) is the state, and Uk is the input
+     Ak, Bk, Wk are model paramateres
+     ------------------
+     Ak, MxM matrix  (M is the length of the X)'''
     Ak = np.copy(Param['Ak'])
     ''' Bk, MxS1 matrix (S1 is the length of Uk, Uk is a vector of size S1x1)'''
     Bk = np.copy(Param['Bk'])
@@ -88,31 +80,30 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
     '''Normal/Gamma Observation Model'''
     if DISTR[0] > 0:
         '''
-        % For Normal,  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik + Vk    Vk variance of iid white noise
-        % For Gamma,   Y(k)=exp((Ck.*Tk)*X(k)+Dk*Ik)    Vk is dispersion term
-        % ------------------
-        % Y(k) is the observation, and Ik is the input either indicator or continuous
-        % Ck, Dk, Vk are the model paramateres
-        % Tk is model specific function - it is original set to but a one matrix
-        % ------------------
-        % Ck, 1xM matrix - (Y is an scalar observation at each time point ... - The Tk has the same size of input,
-        % and it is specfically designed for our task. It can be set to all 1 matrix)'''
+         For Normal,  Y(k)=(Ck.*Tk)*X(k)+Dk*Ik + Vk    Vk variance of iid white noise
+         For Gamma,   Y(k)=exp((Ck.*Tk)*X(k)+Dk*Ik)    Vk is dispersion term
+         ------------------
+         Y(k) is the observation, and Ik is the input either indicator or continuous
+         Ck, Dk, Vk are the model parameters
+         Tk is model specific function - it is original set to but a one matrix
+         ------------------
+         Ck, 1xM matrix - (Y is an scalar observation at each time point ... - The Tk has the same size of input,
+         and it is specfically designed for our task. It can be set to all 1 matrix)
+         '''
         Ck = np.copy(Param['Ck'])
         ''' Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)'''
         Dk = Param['Dk'] * MDk
-        ''' Vk, is scaler represnting noise in Normal or Dispresion Term in Gamma'''
+        ''' Vk, is scaler representing noise in Normal or Dispresion Term in Gamma'''
         Vk = np.copy(Param["Vk"])
-
         ''' Length of data '''
         K = len(Yn)
-
     '''Binary Observation Model (P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )'''
     if DISTR[1] == 1:
-        '''% ------------------
-        % P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
-        % Ek, and Fk are the model paramateres
-        % Qk is model specific function - it is original set to but a one matrix
-        % ------------------'''
+        ''' ------------------
+         P(k) is the observation probability at time k, and Ik is the input either indicator or continuous
+         Ek, and Fk are the model parameters
+         Qk is model specific function - it is original set to but a one matrix
+         ------------------'''
         ''' Ck, NxM matrix - similar to Ck, Tk'''
         Ek = np.copy(Param['Ek'])
         ''' Fk, NxS5 matrix - Similar to Dk'''
@@ -177,7 +168,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         tIb = Ib[k, :].reshape((1, -1))
                     if Uk.size != 0:
                         tUk = Uk[k, :]
-                    tYP, tYB = Csam.compass_sampling(DISTR, censor_time, tUk, tIn, Param, tIb, XPre[k], SPre[k])
+                    tYP, tYB = compass.compass_sampling(DISTR, censor_time, tUk, tIn, Param, tIb, XPre[k], SPre[k])
 
                     if DISTR[0]:
                         Yn[k] = tYP
@@ -887,7 +878,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # p_opt = result_multi.x
                     # MaxO = -result_multi.fun
 
-                    result_multi = fin.fminsearchbnd(objFunc.normal_param_cdv.normal_param_cdv,
+                    result_multi = compass.fminsearchbnd(objective_function.normal_param_cdv,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -913,7 +904,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     lower_bound = np.finfo(np.float64).eps * np.ones(1)
                     upper_bound = 1e3 * np.ones(1)
                     # call optimization function
-                    result_multi = fin.fminsearchbnd(objFunc.normal_param_v.normal_param_v,
+                    result_multi = compass.fminsearchbnd(objective_function.normal_param_v,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -943,7 +934,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     lower_bound = -1e3 * np.ones(len(p0))
                     upper_bound = 1e3 * np.ones(len(p0))
                     # call optimization function
-                    result_multi = fin.fminsearchbnd(objFunc.normal_param_cd.normal_param_cd,
+                    result_multi = compass.fminsearchbnd(objective_function.normal_param_cd,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -969,7 +960,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                 lower_bound = np.finfo(np.float64).eps * np.ones(1)
                 upper_bound = 1e3 * np.ones(1)
                 # call optimization function
-                result_multi = fin.fminsearchbnd(objFunc.normal_param_v.normal_param_v,
+                result_multi = compass.fminsearchbnd(objective_function.normal_param_v,
                                                  p0,
                                                  lower_bound,
                                                  upper_bound,
@@ -1004,7 +995,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # call optimization function
                     # options = optimoptions('lsqnonlin', 'Display', 'off', 'DiffMaxChange', 100, 'MaxIter', 1000)
                     # call optimization function
-                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_full.gamma_param_full,
+                    result_multi = compass.fminsearchbnd(objective_function.gamma_param_full,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -1037,7 +1028,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         ([1], -1e3 * np.ones_like(c_fill_ind), -1e3 * np.ones_like(d_fill_ind)))
                     upper_bound = np.concatenate(([50], 1e3 * np.ones_like(c_fill_ind), 1e3 * np.ones_like(d_fill_ind)))
                     # call optimization function
-                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_minus_S.gamma_param_minus_S,
+                    result_multi = compass.fminsearchbnd(objective_function.gamma_param_minus_S,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -1069,7 +1060,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         ([0], -1e3 * np.ones_like(c_fill_ind), -1e3 * np.ones_like(d_fill_ind)))
                     upper_bound = np.concatenate(
                         ([0.99 * np.min(Yn)], 1e3 * np.ones_like(c_fill_ind), 1e3 * np.ones_like(d_fill_ind)))
-                    result_multi = fin.fminsearchbnd(objFunc.gamma_param_minus_v.gamma_param_minus_v,
+                    result_multi = compass.fminsearchbnd(objective_function.gamma_param_minus_v,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
@@ -1094,11 +1085,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # initiate p0
                     p0 = np.concatenate((ck[c_fill_ind], dk[d_fill_ind]))
                     if np.any(p0):
-                        # lower and upper bound (disperssion Shift Ck Dk)
+                        # lower and upper bound (dispersion Shift Ck Dk)
                         lower_bound = np.concatenate((-1e3 * np.ones(len(c_fill_ind)), -1e3 * np.ones(len(d_fill_ind))))
                         upper_bound = np.concatenate((1e3 * np.ones(len(c_fill_ind)), 1e3 * np.ones(len(d_fill_ind))))
                         # call optimization function
-                        result_multi = fin.fminsearchbnd(objFunc.gamma_param_cd.gamma_param_cd,
+                        result_multi = compass.fminsearchbnd(objective_function.gamma_param_cd,
                                                          p0,
                                                          lower_bound,
                                                          upper_bound,
@@ -1129,15 +1120,17 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     # define bounds
                     lower_bound = -1e3 * np.ones(len(p0))
                     upper_bound = 1e3 * np.ones(len(p0))
+
                     # call optimization function
                     # f = bernoulli_param(p0, e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt, Ib, Yb)
-                    result_multi = fin.fminsearchbnd(objFunc.bernoulli_param.bernoulli_param,
+                    result_multi = compass.fminsearchbnd(objective_function.bernoulli_param,
                                                      p0,
                                                      lower_bound,
                                                      upper_bound,
                                                      None,  # options
                                                      e_fill_ind, f_fill_ind, ek, fk, obs_valid, MEk, xM, XSmt, SSmt,
                                                      Ib, Yb)
+
                     p_opt = result_multi[0]
                     temp = result_multi[1]
                     MaxB = -temp

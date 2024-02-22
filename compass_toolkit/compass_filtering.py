@@ -10,10 +10,9 @@ Following modifications were made to
 """
 
 import numpy as np
-import compass_Tk as Ctk
-import compass_Qk as Cqk
-import compass_sampling as Csam
-import algorithms_details as ad
+import compass_toolkit.compass_Tk as Ctk
+import compass_toolkit.compass_Qk as Cqk
+import compass_toolkit.compass_sampling as Csam
 
 """
 Comments for the variables down here
@@ -68,7 +67,7 @@ def compass_filtering(DISTR=None, Uk=None, In=None, Param=None, Ib=None, Yn=None
         Ck = np.copy(Param['Ck'])
         # Bk, NxS3 matrix - (We have an input of the length S3, and Dk will be size of NxS3)
         Dk = Param['Dk'] * MDk
-        # Vk, is scaler representing noise in Normal or Dispresion Term in Gamma
+        # Vk, is scaler representing noise in Normal or Dispersion Term in Gamma
         Vk = np.copy(Param["Vk"])
 
     '''Binary Observation Model (P(k)=sigmoid((Ek.*Qk)*X(k)+Fk*Ik) )'''
@@ -99,7 +98,7 @@ def compass_filtering(DISTR=None, Uk=None, In=None, Param=None, Ib=None, Yn=None
     if obs_valid >= 1:
         '''Draw a sample if it is censored'''
         if obs_valid == 2:
-            [tYP, tYB] = Csam.compass_sampling(DISTR=DISTR, Cut_Time=censor_time, tUk = Uk, tIn=In, tParam=Param, Ib=Ib,
+            [tYP, tYB] = Csam.compass_sampling(DISTR=DISTR, Cut_Time=censor_time, tUk=Uk, tIn=In, tParam=Param, Ib=Ib,
                                                XPos0=XPre, SPos0=SPre)
             if DISTR[0] > 0:
                 Yn = tYP
@@ -186,11 +185,11 @@ def compass_filtering(DISTR=None, Uk=None, In=None, Param=None, Ib=None, Yn=None
                     Yp = np.exp(CTk @ xpos + DTk @ In.T)
                     xpos = XPre - SPre @ Vk @ CTk.T @ (1 - Yk * np.linalg.inv(Yp))
                 XPos = xpos
-                SPos = np.linalg.inv((np.linalg.inv(SPre) + (Vk @ (Yk  * np.linalg.inv(Yp))) * CTk.T @ CTk))
+                SPos = np.linalg.inv((np.linalg.inv(SPre) + (Vk @ (Yk * np.linalg.inv(Yp))) * CTk.T @ CTk))
             if update_mode == 2:
                 Yk = Yn - Param['S']
                 Yp = np.exp(CTk @ XPre + DTk @ In.T)
-                SPos = np.linalg.inv(np.linalg.inv(SPre) + Vk @ (Yk @ np.linalg.inv(Yp)) @ Ctk.T @ CTk)
+                SPos = np.linalg.inv(np.linalg.inv(SPre) + Vk @ (Yk @ np.linalg.inv(Yp)) @ CTk.T @ CTk)
                 XPos = XPre - SPos @ Vk @ CTk.T @ (1 - (Yk @ np.linalg.inv(Yp)))
 
         ''' Observation: Gamma+Bernoulli'''
@@ -247,7 +246,7 @@ def compass_filtering(DISTR=None, Uk=None, In=None, Param=None, Ib=None, Yn=None
             YP = temp.T
         else:
             temp = CTk @ XPos + DTk @ In.T
-            YP = np.exp(0.5 * CTk @ temp @ CTk.T) # np.exp(temp) @ np.exp(0.5 @ CTk @ SPos @ CTk.T)
+            YP = np.exp(0.5 * CTk @ temp @ CTk.T)  # np.exp(temp) @ np.exp(0.5 @ CTk @ SPos @ CTk.T)
             # SP = np.exp(2 * temp) @ np.exp(2 @ CTk @ SPos @ CTk.T) - YP @ YP
             # YP = np.exp(0.5 @ CTk @ SPos @ CTk.T)
             YP = Param['S'] + YP
