@@ -152,10 +152,10 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
         for k in range(0, K):
             # One-step prediction
             if k == 0:
-                XPre[k] = Ak @ X0 + Bk @ Uk[k, :].T
+                XPre[k] = Ak @ X0 + Bk @ Uk[k, np.newaxis].T
                 SPre[k] = Ak @ W0 @ Ak.T + Wk
             else:
-                XPre[k] = Ak @ XPos[k - 1] + Bk @ Uk[k, :].T
+                XPre[k] = Ak @ XPos[k - 1] + Bk @ Uk[k, np.newaxis].T
                 SPre[k] = Ak @ SPos[k - 1] @ Ak.T + Wk
             # Check if the data point is censored or not
             if obs_valid[k]:
@@ -163,11 +163,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                 if obs_valid[k] == 2 and Param['censor_mode'] == 1:
                     tIn, tIb, tUk = [], [], []
                     if DISTR[0]:
-                        tIn = In[k, :].reshape((1, -1))
+                        tIn = In[k, np.newaxis]
                     if DISTR[1]:
-                        tIb = Ib[k, :].reshape((1, -1))
+                        tIb = Ib[k, np.newaxis]
                     if Uk.size != 0:
-                        tUk = Uk[k, :]
+                        tUk = Uk[k, np.newaxis]
                     tYP, tYB = compass.compass_sampling(DISTR, censor_time, tUk, tIn, Param, tIb, XPre[k], SPre[k])
 
                     if DISTR[0]:
@@ -183,7 +183,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         T = np.copy(Param['censor_time'])
                         if Param['censor_update_mode'] == 1:
                             # SPos Update first
-                            Mx = CTk * XPre[k] + DTk @ In[k, :].T
+                            Mx = CTk * XPre[k] + DTk @ In[k, np.newaxis].T
                             Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx  # likelihood is not zero to avoid division by zero when computing Tx.
@@ -199,7 +199,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             # XPos update first
                             xpos = XPre[k]
                             for h in range(in_loop):
-                                Mx = CTk @ xpos + DTk @ In[k, :].T
+                                Mx = CTk @ xpos + DTk @ In[k, np.newaxis].T
                                 Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                                 Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                                 Tx = Gx / Lx
@@ -208,7 +208,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 xpos = XPre[k] + SPre[k] * Ac
 
                             XPos[k] = xpos
-                            Mx = CTk @ xpos + DTk @ In[k, :].T
+                            Mx = CTk @ xpos + DTk @ In[k, np.newaxis].T
                             Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
@@ -220,7 +220,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     else:
                         # XPos
                         Sk = CTk @ SPre[k] @ CTk.T + Vk
-                        Yp = CTk @ XPre[k] + DTk @ In[k, :].T
+                        Yp = CTk @ XPre[k] + DTk @ In[k, np.newaxis].T
                         XPos[k] = XPre[k] + SPre[k] * CTk.T @ np.linalg.inv(Sk) @ (Yn[k] - Yp)
                         # SPos
                         SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + CTk.T @ (1 / Vk) @ CTk)
@@ -237,7 +237,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         # XPos update
                         xpos = XPre[k]
                         for h in range(in_loop):
-                            st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, :])
+                            st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, np.newaxis].T)
                             pk = np.exp(st) / (1 + np.exp(st))
                             xpos = XPre[k] + SPre[k] * ETk.T @ (Yb[k] - pk)
                         XPos[k] = xpos
@@ -246,7 +246,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
                     # one-step mode
                     if update_mode == 2:
-                        st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, :].T)
+                        st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, np.newaxis].T)
                         pk = np.exp(st) / (1 + np.exp(st))
                         SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + ETk.T @ np.diag(pk * (1 - pk)) @ ETk)
                         XPos[k] = XPre[k] + SPos[k] * ETk.T @ (Yb[k] - pk)
@@ -262,7 +262,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         # update mode 1
                         if Param["censor_update_mode"] == 1:
                             # SPos Update first
-                            Mx = CTk @ XPre[k] + DTk @ In[k, :].T
+                            Mx = CTk @ XPre[k] + DTk @ In[k, np.newaxis].T
                             Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
@@ -278,7 +278,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             # XPos update first
                             xpos = XPre[k]
                             for h in range(in_loop):
-                                Mx = CTk @ xpos + DTk @ In[k, :].T
+                                Mx = CTk @ xpos + DTk @ In[k, np.newaxis].T
                                 Lx = np.maximum(EPS, norm.sf(Yn[k], loc=Mx, scale=np.sqrt(Vk)))
                                 Gx = norm.pdf(Yn[k], Mx, np.sqrt(Vk))
                                 Tx = Gx / Lx
@@ -286,7 +286,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 Ac = CTk.T @ Tx
                                 xpos = XPre[k] + SPre[k] * Ac
                             XPos[k] = xpos
-                            Mx = CTk @ xpos + DTk @ In[k, :].T
+                            Mx = CTk @ xpos + DTk @ In[k, np.newaxis].T
                             Lx = np.maximum(EPS, norm.sf(T, loc=Mx, scale=np.sqrt(Vk)))
                             Gx = norm.pdf(T, Mx, np.sqrt(Vk))
                             Tx = Gx / Lx
@@ -301,10 +301,10 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             # recursive mode
                             in_loop = 10
                             xpos = XPre[k]
-                            Yp = CTk @ XPre[k] + DTk @ In[k, :].T
+                            Yp = CTk @ XPre[k] + DTk @ In[k, np.newaxis].T
                             Sk = (CTk.T @ np.linalg.inv(Vk) @ CTk + np.linalg.inv(SPre[k]))
                             for z in range(in_loop):
-                                st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, :].T)
+                                st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, np.newaxis].T)
                                 pk = np.exp(st) / (1 + np.exp(st))
                                 xpos = XPre[k] + np.linalg.inv(Sk) @ (
                                         ETk.T @ (Yb[k] - pk) + CTk.T @ np.linalg.inv(Vk) @ (Yn[k] - Yp))
@@ -316,8 +316,8 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
 
                         # one-step mode
                         if update_mode == 2:
-                            Yp = CTk @ XPre[k] + DTk @ In[k, :].T
-                            st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, :].T)
+                            Yp = CTk @ XPre[k] + DTk @ In[k,np.newaxis].T
+                            st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, np.newaxis].T)
                             pk = np.exp(st) / (1 + np.exp(st))
                             SPos[k] = np.linalg.inv(
                                 np.linalg.inv(SPre[k]) + ETk.T @ np.diag(pk * (1 - pk)) @ ETk + CTk.T @ np.linalg.inv(
@@ -335,7 +335,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         # censor time
                         if Param["censor_update_mode"] == 1:
                             # expected y
-                            Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
+                            Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, np.newaxis].T)
                             Hx = (Yn[k] - S) @ Vk / Mx
                             # components to estimate posterior
                             Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -354,7 +354,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             xpos = XPre[k]
                             for h in range(in_loop):
                                 # expected y
-                                Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                                Mx = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                                 Hx = (Yn[k] - S) @ Vk / Mx
                                 # components to estimate posterior
                                 Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -365,7 +365,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 Ac = CTk.T @ Ta @ Hx
                                 xpos = XPre[k] + SPre[k] * Ac
                             XPos[k] = xpos
-                            Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                            Mx = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                             Hx = (Yn[k] - S) * Vk / Mx
                             # components to estimate posterior
                             Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -384,13 +384,13 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             in_loop = 10
                             xpos = XPre[k]
                             for h in range(in_loop):
-                                Yp = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                                Yp = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                                 xpos = XPre[k] - SPre[k] * Vk @ CTk.T @ (1 - Yk / Yp)
                             XPos[k] = xpos
                             SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + (Vk * (Yk / Yp)) * CTk.T @ CTk)
                         if update_mode == 2:
                             Yk = Yn[k] - S
-                            Yp = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
+                            Yp = np.exp(CTk @ XPre[k] + DTk @ In[k, np.newaxis].T)
                             SPos[k] = np.linalg.inv(np.linalg.inv(SPre[k]) + (Vk * (Yk / Yp)) * CTk.T @ CTk)
                             XPos[k] = XPre[k] - SPos[k] * Vk @ CTk.T @ (1 - Yk / Yp)
                 # Observation: Gamma + Bernoulli
@@ -403,7 +403,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         # censor time
                         if Param["censor_update_mode"] == 1:
                             # expected y
-                            Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
+                            Mx = np.exp(CTk @ XPre[k] + DTk @ In[k, np.newaxis].T)
                             Hx = (Yn[k] - S) @ Vk / Mx
                             # components to estimate posterior
                             Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -422,7 +422,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             xpos = XPre[k]
                             for h in range(in_loop):
                                 # expected y
-                                Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                                Mx = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                                 Hx = (Yn[k] - S) @ Vk / Mx
                                 # components to estimate posterior
                                 Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -434,7 +434,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                                 xpos = XPre[k] + SPre[k] * Ac
 
                             XPos[k] = xpos
-                            Mx = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                            Mx = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                             Hx = (Yn[k] - S) * Vk / Mx
                             # components to estimate posterior
                             Lx = np.maximum(EPS, gammaincc(Vk, Hx))
@@ -452,9 +452,9 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             Yk = Yn[k] - S
                             xpos = XPre[k]
                             for h in range(in_loop):
-                                st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, :].T)
+                                st = np.minimum(MAX_EXP, ETk @ xpos + FTk @ Ib[k, np.newaxis].T)
                                 pk = np.exp(st) / (1 + np.exp(st))
-                                Yp = np.exp(CTk @ xpos + DTk @ In[k, :].T)
+                                Yp = np.exp(CTk @ xpos + DTk @ In[k, np.newaxis].T)
                                 xpos = XPre[k] + SPre[k] * (ETk.T @ (Yb[k] - pk) - Vk @ CTk.T @ (1 - Yk / Yp))
 
                             XPos[k] = xpos
@@ -466,9 +466,9 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         if update_mode == 2:
                             # XPos, SPos
                             Yk = Yn[k] - S
-                            Yp = np.exp(CTk @ XPre[k] + DTk @ In[k, :].T)
+                            Yp = np.exp(CTk @ XPre[k] + DTk @ In[k, np.newaxis].T)
                             # Pk
-                            st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, :].T)
+                            st = np.minimum(MAX_EXP, ETk @ XPre[k] + FTk @ Ib[k, np.newaxis].T)
                             pk = np.exp(st) / (1 + np.exp(st))
                             # SPos
                             SPos[k] = np.linalg.inv(
@@ -543,10 +543,10 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                 DTk = Dk
                 # EYn
                 if DISTR[0] == 1:
-                    temp = CTk @ XSmt[k] + DTk @ In[k, :].T
+                    temp = CTk @ XSmt[k] + DTk @ In[k, np.newaxis].T
                     EYn[k] = temp.T
                 else:
-                    temp = CTk @ XSmt[k] + DTk @ In[k, :].T
+                    temp = CTk @ XSmt[k] + DTk @ In[k, np.newaxis].T
                     EYn[k] = np.exp(temp)
 
         if DISTR[1] == 1:
@@ -555,7 +555,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                 ETk = (Ek * MEk[k]) @ xM
                 FTk = Fk
                 # YP
-                temp = ETk @ XSmt[k] + FTk @ Ib[k, :].T
+                temp = ETk @ XSmt[k] + FTk @ Ib[k, np.newaxis].T
                 EYb[k] = np.exp(temp.T) / (1 + np.exp(temp.T))
 
         """Parameter Estimation Section
@@ -587,16 +587,16 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     if k == 0:
                         # Calculate At
                         SecA = Ckk0
-                        SecB = XSmt0 @ Uk[k, :]
-                        SecC = Uk[k, :].T @ XSmt0.T
-                        SecD = Uk[k, :].T @ Uk[k, :]
+                        SecB = XSmt0 @ Uk[k, np.newaxis]
+                        SecC = Uk[k, np.newaxis].T @ XSmt0.T
+                        SecD = Uk[k, np.newaxis].T @ Uk[k, np.newaxis]
                         At = At + np.vstack([np.hstack([SecA, SecB]), np.hstack([SecC, SecD])])
                     else:
                         # Calculate At
                         SecA = Ckk[k - 1]
-                        SecB = XSmt[k - 1] * Uk[k, :]
-                        SecC = Uk[k, :].T @ XSmt[k - 1].T
-                        SecD = Uk[k, :].T @ Uk[k, :]
+                        SecB = XSmt[k - 1] * Uk[k, np.newaxis]
+                        SecC = Uk[k, np.newaxis].T @ XSmt[k - 1].T
+                        SecD = Uk[k, np.newaxis].T @ Uk[k, np.newaxis]
                         At = At + np.vstack([np.hstack([SecA, SecB]), np.hstack([SecC, SecD])])
                 # We define Bt per row
                 for d in range(dx):
@@ -605,9 +605,9 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     for k in range(K):
                         # Calculate Bt
                         temp = Ckk_1[k]
-                        SecA = temp[:, d]
+                        SecA = temp[:, d][:, np.newaxis]
                         temp = XSmt[k]
-                        SecB = temp[d] @ Uk[k, :].T
+                        SecB = temp[d] @ Uk[k, np.newaxis].T
                         Bt = Bt + np.vstack([SecA, SecB])
                     # Calculate At and Bt for the d-th row
                     T = np.linalg.pinv(At) @ Bt
@@ -625,24 +625,24 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                             temp = Ckk0
                             SecA = temp[d, d]
                             temp = XSmt0
-                            SecB = temp[d] @ Uk[k, :]
-                            SecC = Uk[k, :].T @ temp[d]
-                            SecD = Uk[k, :].T @ Uk[k, :]
+                            SecB = temp[d] @ Uk[k, np.newaxis]
+                            SecC = Uk[k, np.newaxis].T @ temp[d]
+                            SecD = Uk[k, np.newaxis].T @ Uk[k, np.newaxis]
                             At = At + np.vstack([np.hstack([SecA, SecB]), np.hstack([SecC, SecD])])
                         else:
                             # Calculate At
                             temp = Ckk[k - 1]
                             SecA = temp[d, d]
                             temp = XSmt[k - 1]
-                            SecB = temp[d] @ Uk[k, :]
-                            SecC = Uk[k, :].T @ temp[d]
-                            SecD = Uk[k, :].T @ Uk[k, :]
+                            SecB = temp[d] @ Uk[k, np.newaxis]
+                            SecC = Uk[k, np.newaxis].T @ temp[d]
+                            SecD = Uk[k, np.newaxis].T @ Uk[k, np.newaxis]
                             At = At + np.vstack([np.hstack([SecA, SecB]), np.hstack([SecC, SecD])])
                         # Calculate Bt
                         temp = Ckk_1[k]
                         SecA = temp[d, d].T
                         temp = XSmt[k]
-                        SecB = temp[d] * Uk[k, :].T
+                        SecB = temp[d] * Uk[k, np.newaxis].T
                         Bt = Bt + np.vstack([SecA, SecB])
                     # Calculate At and Bt for the d-th row
                     T = np.linalg.pinv(At) @ Bt
@@ -657,7 +657,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
             At = np.zeros((di, di))
             for k in range(K):
                 # Calculate At
-                SecD = np.outer(Uk[k, :], Uk[k, :])
+                SecD = np.outer(Uk[k, np.newaxis], Uk[k, np.newaxis])
                 At += SecD
 
             # We define Bt per row
@@ -670,7 +670,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         temp = XSmt[k] - Ak @ XSmt0
                     else:
                         temp = XSmt[k] - Ak @ XSmt[k - 1]
-                    Bt += temp[d] @ Uk[k, :].T
+                    Bt += temp[d] @ Uk[k, np.newaxis].T
 
                 # Calculate At and Bt for the d-th row
                 upBk[d, :] = np.linalg.pinv(At) @ Bt
@@ -715,7 +715,7 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                         num_a -= Ckk[k - 1][d, d - 1]
                         num_a += XSmt[k][d] * Uk[k - 1, d // 2]
 
-                        den_a += SSmt[k - 1][d - 1, d - 1] + (XSmt[k - 1][d - 1] - sum(Uk[k - 1, :])) ** 2
+                        den_a += SSmt[k - 1][d - 1, d - 1] + (XSmt[k - 1][d - 1] - sum(Uk[k - 1, np.newaxis])) ** 2
                 upAk[d, d] = 1
                 upAk[d, d - 1] = -(num_a / den_a)
                 upBk[d, d // 2] = num_a / den_a
@@ -733,11 +733,11 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     den_a = den_a + SSmt0[d, d] + XSmt0[d] ** 2
                 else:
                     num_a = num_a + SSmt[k - 1][d, d] + XSmt[k - 1][d] ** 2
-                    num_a = num_a - XSmt[k - 1][d] * sum(Uk[k - 1, :])
+                    num_a = num_a - XSmt[k - 1][d] * sum(Uk[k - 1, np.newaxis])
                     num_a = num_a - Ckk[k - 1][d, d]
-                    num_a = num_a + XSmt[k][d] * sum(Uk[k - 1, :])
+                    num_a = num_a + XSmt[k][d] * sum(Uk[k - 1, np.newaxis])
 
-                    den_a = den_a + SSmt[k - 1][d, d] + (XSmt[k - 1][d] - sum(Uk[k - 1, :])) ** 2
+                    den_a = den_a + SSmt[k - 1][d, d] + (XSmt[k - 1][d] - sum(Uk[k - 1, np.newaxis])) ** 2
 
             upAk[d, d] = 1 - (num_a / den_a)
             upBk[d, :] = num_a / den_a
@@ -752,36 +752,36 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     upWk[d, d] = upWk[d, d] + temp[d, d]
                     # add E(Xk-1*Xk-1)*A^2
                     temp = Ckk0
-                    upWk[d, d] = upWk[d, d] + upAk[d, :] @ temp @ upAk[d, :].T
+                    upWk[d, d] = upWk[d, d] + upAk[d, np.newaxis] @ temp @ upAk[d, np.newaxis].T
                     # add Bk*Uk^2
-                    upWk[d, d] = upWk[d, d] + (upBk[d, :] * Uk[k, :].T) ** 2
+                    upWk[d, d] = upWk[d, d] + (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) ** 2
                     # add -2*A*E(Xk-1*Xk)
                     temp = Ckk_1[k]
-                    upWk[d, d] = upWk[d, d] - upAk[d, :] @ (temp[:, d] + temp[d, :].T)
+                    upWk[d, d] = upWk[d, d] - upAk[d, np.newaxis] @ (temp[:, d][:, np.newaxis] + temp[d, np.newaxis].T)
                     # add -2*B*U*E(Xk)
                     temp = XSmt[k]
-                    upWk[d, d] = upWk[d, d] - 2 * (upBk[d, :] * Uk[k, :].T) @ temp[d]
+                    upWk[d, d] = upWk[d, d] - 2 * (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) @ temp[d]
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt0
-                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, :] * Uk[k, :].T) * upAk[d, :] @ temp
+                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) * upAk[d, np.newaxis] @ temp
                 else:
                     # add E(Xk*Xk)
                     temp = Ckk[k]
                     upWk[d, d] = upWk[d, d] + temp[d, d]
                     # add E(Xk-1*Xk-1)*A^2
                     temp = Ckk[k - 1]
-                    upWk[d, d] = upWk[d, d] + (upAk[d, :] @ (temp @ upAk[d, :].T))
+                    upWk[d, d] = upWk[d, d] + (upAk[d, np.newaxis] @ (temp @ upAk[d, np.newaxis].T))
                     # add Bk*Uk^2
-                    upWk[d, d] = upWk[d, d] + (upBk[d, :] * Uk[k, :].T) ** 2
+                    upWk[d, d] = upWk[d, d] + (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) ** 2
                     # add -2*A*E(Xk-1*Xk)
                     temp = Ckk_1[k]
-                    upWk[d, d] = upWk[d, d] - upAk[d, :] @ (temp[:, d] + temp[d, :])
+                    upWk[d, d] = upWk[d, d] - upAk[d, np.newaxis] @ (temp[:, d][:, np.newaxis] + temp[d, np.newaxis].T)
                     # add -2*B*U*E(Xk)
                     temp = XSmt[k]
-                    upWk[d, d] = upWk[d, d] - 2 * (upBk[d, :] * Uk[k, :].T) @ temp[d]
+                    upWk[d, d] = upWk[d, d] - 2 * (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) @ temp[d]
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt[k - 1]
-                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, :] * Uk[k, :].T) @ (upAk[d, :] @ temp)
+                    upWk[d, d] = upWk[d, d] + 2 * (upBk[d, np.newaxis] @ Uk[k, np.newaxis].T) @ (upAk[d, np.newaxis] @ temp)
 
             upWk[d, d] = upWk[d, d] / K
             # ---------------------------------
@@ -812,36 +812,36 @@ def compass_em(DISTR=None, Uk=None, In=None, Ib=None, Yn=None, Yb=None, Param=No
                     TempH = TempH + temp[d, d]
                     # add E(Xk-1*Xk-1)*A^2
                     temp = Ckk0
-                    TempH = TempH + Ak[d, :] @ temp @ Ak[d, :].T
+                    TempH = TempH + Ak[d, np.newaxis] @ temp @ Ak[d, np.newaxis].T
                     # add Bk*Uk^2
-                    TempH = TempH + (Bk[d, :] @ (Uk[k, :].T)) ** 2
+                    TempH = TempH + (Bk[d, np.newaxis] @ (Uk[k, np.newaxis].T)) ** 2
                     # add -2*A*E(Xk-1*Xk)
                     temp = Ckk_1[k]
-                    TempH = TempH - Ak[d, :] @ (temp[:, d] + temp[d, :])
+                    TempH = TempH - Ak[d, np.newaxis] @ (temp[:, d][:, np.newaxis] + temp[d, np.newaxis].T)
                     # add -2*B*U*E(Xk)
                     temp = XSmt[k]
-                    TempH = TempH - 2 * (Bk[d, :] @ Uk[k, :].T) * temp[d]
+                    TempH = TempH - 2 * (Bk[d, np.newaxis] @ Uk[k, np.newaxis].T) * temp[d]
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt0
-                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) * (Ak[d, :] @ temp)  # sumedh
+                    TempH = TempH + 2 * (Bk[d, np.newaxis] @ Uk[k, np.newaxis].T) * (Ak[d, np.newaxis] @ temp)  # sumedh
                 else:
                     # add E(Xk*Xk)
                     temp = Ckk[k]
                     TempH = TempH + temp[d, d]
                     # add E(Xk-1*Xk-1)*A^2
                     temp = Ckk[k - 1]
-                    TempH = TempH + Ak[d, :] @ temp @ Ak[d, :].T
+                    TempH = TempH + Ak[d, np.newaxis] @ temp @ Ak[d, np.newaxis].T
                     # add Bk*Uk^2
-                    TempH = TempH + (Bk[d, :] @ Uk[k, :].T) ** 2
+                    TempH = TempH + (Bk[d, np.newaxis] @ Uk[k, np.newaxis].T) ** 2
                     # add -2*A*E(Xk-1*Xk)
                     temp = Ckk_1[k]
-                    TempH = TempH - Ak[d, :] @ (temp[:, d] + temp[d, :].T)
+                    TempH = TempH - Ak[d, np.newaxis] @ (temp[:, d][:, np.newaxis] + temp[d, np.newaxis].T)
                     # add -2*B*U*E(Xk)
                     temp = XSmt[k]
-                    TempH = TempH - 2 * ((Bk[d, :] @ Uk[k, :].T) * temp[d])  # sumedh
+                    TempH = TempH - 2 * ((Bk[d, np.newaxis] @ Uk[k, np.newaxis].T) * temp[d])  # sumedh
                     # add 2 *B*U*A*E(Xk-1)
                     temp = XSmt[k - 1]
-                    TempH = TempH + 2 * (Bk[d, :] @ Uk[k, :].T) * (Ak[d, :] @ temp)  # sumedh
+                    TempH = TempH + 2 * (Bk[d, np.newaxis] @ Uk[k, np.newaxis].T) * (Ak[d, :] @ temp)  # sumedh
 
             MaxH = MaxH - 0.5 * TempH / Wk[d, d]
 
